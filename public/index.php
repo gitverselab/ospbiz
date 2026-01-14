@@ -62,6 +62,14 @@ elseif ($uri === '/audit/logs') {
     $controller = new AuditController();
     $controller->index();
 }
+elseif ($uri === '/settings/coa') {
+    $controller = new COAController();
+    $controller->index();
+}
+elseif ($uri === '/settings/coa/create') {
+    $controller = new COAController();
+    $controller->create();
+}
 // CATCH ALL: If the route starts with /bank, /expenses, /revenue, etc.
 elseif (preg_match('#^/(bank|expenses|revenue|settings|admin)#', $uri)) {
     // Show the "Under Construction" view using the Main Layout
