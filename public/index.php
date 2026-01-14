@@ -49,6 +49,40 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 if ($uri === '/' || $uri === '/index.php' || $uri === '/dashboard') {
     $controller = new JournalController();
     $controller->index();
+}
+elseif ($uri === '/bank/passbooks') {
+    $controller = new BankController();
+    $controller->index();
+}
+elseif ($uri === '/bank/passbooks/create') {
+    $controller = new BankController();
+    $controller->store();
+}
+elseif ($uri === '/bank/passbooks/view') {
+    $controller = new BankController();
+    $controller->show();
+}
+elseif ($uri === '/bank/passbooks/transaction') {
+    $controller = new BankController();
+    $controller->storeTransaction();
+}
+
+// Reuse similar logic for /bank/cash-on-hand routes mapped to CashController
+elseif ($uri === '/bank/cash-on-hand') {
+    $controller = new CashController();
+    $controller->index();
+}
+elseif ($uri === '/bank/cash-on-hand/create') {
+    $controller = new CashController();
+    $controller->store();
+}
+elseif ($uri === '/bank/cash-on-hand/view') {
+    $controller = new CashController();
+    $controller->show();
+}
+elseif ($uri === '/bank/cash-on-hand/transaction') {
+    $controller = new CashController();
+    $controller->storeTransaction();
 } 
 elseif ($uri === '/journal/create') {
     $controller = new JournalController();
