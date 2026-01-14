@@ -48,89 +48,25 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 // --- DASHBOARD ---
 if ($uri === '/' || $uri === '/index.php' || $uri === '/dashboard') {
-    $controller = new JournalController();
-    $controller->index();
+    $c = new JournalController(); $c->index();
 } 
 
-// --- JOURNAL ENTRIES ---
-elseif ($uri === '/journal/create') {
-    $controller = new JournalController();
-    $controller->create();
+// --- EXPENSES: PURCHASES (Fixing the Under Construction Issue) ---
+// These MUST be placed above the catch-all
+elseif ($uri === '/expenses/purchases') {
+    $c = new PurchaseController(); $c->index();
 }
-elseif ($uri === '/journal/list') {
-    $controller = new JournalController();
-    $controller->list();
+elseif ($uri === '/expenses/purchases/create') {
+    $c = new PurchaseController(); $c->create();
 }
-elseif ($uri === '/journal/approve') {
-    $controller = new JournalController();
-    $controller->approve();
+elseif ($uri === '/expenses/payments') {
+    $c = new PurchasePaymentController(); $c->index();
 }
-
-// --- AUDIT TRAIL ---
-elseif ($uri === '/audit/logs') {
-    $controller = new AuditController();
-    $controller->index();
+elseif ($uri === '/expenses/payments/create') {
+    $c = new PurchasePaymentController(); $c->create();
 }
 
-// --- SETTINGS: COA ---
-elseif ($uri === '/settings/coa') {
-    $controller = new COAController();
-    $controller->index();
-}
-elseif ($uri === '/settings/coa/create') {
-    $controller = new COAController();
-    $controller->create();
-}
-
-// --- SETTINGS: MASTER DATA (Suppliers/Customers) ---
-elseif ($uri === '/settings/suppliers') {
-    $controller = new ContactController(); $controller->suppliers();
-}
-elseif ($uri === '/settings/suppliers/create') {
-    $controller = new ContactController(); $controller->createSupplier();
-}
-elseif ($uri === '/settings/customers') {
-    $controller = new ContactController(); $controller->customers();
-}
-elseif ($uri === '/settings/customers/create') {
-    $controller = new ContactController(); $controller->createCustomer();
-}
-
-// --- BANK: PASSBOOKS ---
-elseif ($uri === '/bank/passbooks') {
-    $c = new BankController(); $c->index();
-}
-elseif ($uri === '/bank/passbooks/create') {
-    $c = new BankController(); $c->store();
-}
-elseif ($uri === '/bank/passbooks/view') {
-    $c = new BankController(); $c->show();
-}
-elseif ($uri === '/bank/passbooks/transaction') {
-    $c = new BankController(); $c->storeTransaction();
-}
-
-// --- BANK: CASH ON HAND ---
-elseif ($uri === '/bank/cash-on-hand') {
-    $c = new CashController(); $c->index();
-}
-elseif ($uri === '/bank/cash-on-hand/create') {
-    $c = new CashController(); $c->store();
-}
-elseif ($uri === '/bank/cash-on-hand/view') {
-    $c = new CashController(); $c->show();
-}
-elseif ($uri === '/bank/cash-on-hand/transaction') {
-    $c = new CashController(); $c->storeTransaction();
-}
-elseif ($uri === '/bank/cash-on-hand/transaction/update') {
-    $c = new CashController(); $c->updateTransaction();
-}
-elseif ($uri === '/bank/cash-on-hand/transaction/delete') {
-    $c = new CashController(); $c->deleteTransaction();
-}
-
-// --- EXPENSES: DAILY EXPENSES (New Module) ---
+// --- EXPENSES: DAILY EXPENSES ---
 elseif ($uri === '/expenses/daily') {
     $c = new DailyExpenseController(); $c->index();
 }
@@ -141,22 +77,6 @@ elseif ($uri === '/expenses/daily/settle') {
     $c = new DailyExpenseController(); $c->settle();
 }
 
-// --- EXPENSES: PURCHASE ORDERS ---
-elseif ($uri === '/expenses/purchases') {
-    $c = new PurchaseController(); $c->index();
-}
-elseif ($uri === '/expenses/purchases/create') {
-    $c = new PurchaseController(); $c->create();
-}
-
-// --- EXPENSES: PURCHASE PAYMENTS ---
-elseif ($uri === '/expenses/payments') {
-    $c = new PurchasePaymentController(); $c->index();
-}
-elseif ($uri === '/expenses/payments/create') {
-    $c = new PurchasePaymentController(); $c->create();
-}
-
 // --- EXPENSES: BILLS ---
 elseif ($uri === '/expenses/bills') {
     $c = new BillController(); $c->index();
@@ -165,15 +85,67 @@ elseif ($uri === '/expenses/bills/create') {
     $c = new BillController(); $c->create();
 }
 
+// --- JOURNAL ENTRIES ---
+elseif ($uri === '/journal/create') {
+    $c = new JournalController(); $c->create();
+}
+elseif ($uri === '/journal/list') {
+    $c = new JournalController(); $c->list();
+}
+elseif ($uri === '/journal/approve') {
+    $c = new JournalController(); $c->approve();
+}
+
+// --- AUDIT TRAIL ---
+elseif ($uri === '/audit/logs') {
+    $c = new AuditController(); $c->index();
+}
+
+// --- SETTINGS & MASTER DATA ---
+elseif ($uri === '/settings/coa') {
+    $c = new COAController(); $c->index();
+}
+elseif ($uri === '/settings/coa/create') {
+    $c = new COAController(); $c->create();
+}
+elseif ($uri === '/settings/suppliers') {
+    $c = new ContactController(); $c->suppliers();
+}
+elseif ($uri === '/settings/suppliers/create') {
+    $c = new ContactController(); $c->createSupplier();
+}
+elseif ($uri === '/settings/customers') {
+    $c = new ContactController(); $c->customers();
+}
+elseif ($uri === '/settings/customers/create') {
+    $c = new ContactController(); $c->createCustomer();
+}
+
+// --- BANK & CASH ---
+elseif (strpos($uri, '/bank/passbooks') === 0) {
+    $c = new BankController();
+    if ($uri === '/bank/passbooks') $c->index();
+    elseif ($uri === '/bank/passbooks/create') $c->store();
+    elseif ($uri === '/bank/passbooks/view') $c->show();
+    elseif ($uri === '/bank/passbooks/transaction') $c->storeTransaction();
+}
+elseif (strpos($uri, '/bank/cash-on-hand') === 0) {
+    $c = new CashController();
+    if ($uri === '/bank/cash-on-hand') $c->index();
+    elseif ($uri === '/bank/cash-on-hand/create') $c->store();
+    elseif ($uri === '/bank/cash-on-hand/view') $c->show();
+    elseif ($uri === '/bank/cash-on-hand/transaction') $c->storeTransaction();
+    elseif ($uri === '/bank/cash-on-hand/transaction/update') $c->updateTransaction();
+    elseif ($uri === '/bank/cash-on-hand/transaction/delete') $c->deleteTransaction();
+}
+
 // --- CATCH ALL (Under Construction) ---
-// This MUST come LAST. It catches anything that wasn't defined above.
+// This handles any other /expenses/ or /bank/ url NOT defined above
 elseif (preg_match('#^/(bank|expenses|revenue|settings|admin)#', $uri)) {
     $pageTitle = "Work In Progress";
     require_once ROOT_PATH . '/app/views/layouts/main.php';
 }
-
-// --- 404 NOT FOUND ---
 else {
     header("HTTP/1.0 404 Not Found");
-    echo "<h1>404 Not Found</h1><p>The page $uri could not be found.</p>";
+    echo "<h1>404 Not Found</h1>";
 }
