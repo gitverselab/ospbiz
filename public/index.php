@@ -70,6 +70,24 @@ elseif ($uri === '/settings/coa/create') {
     $controller = new COAController();
     $controller->create();
 }
+// SUPPLIERS
+elseif ($uri === '/settings/suppliers') {
+    $controller = new ContactController(); // Auto-loads ContactController.php
+    $controller->suppliers();
+}
+elseif ($uri === '/settings/suppliers/create') {
+    $controller = new ContactController();
+    $controller->createSupplier();
+}
+// CUSTOMERS
+elseif ($uri === '/settings/customers') {
+    $controller = new ContactController();
+    $controller->customers();
+}
+elseif ($uri === '/settings/customers/create') {
+    $controller = new ContactController();
+    $controller->createCustomer();
+}
 // CATCH ALL: If the route starts with /bank, /expenses, /revenue, etc.
 elseif (preg_match('#^/(bank|expenses|revenue|settings|admin)#', $uri)) {
     // Show the "Under Construction" view using the Main Layout
