@@ -43,7 +43,19 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 if ($uri === '/' || $uri === '/index.php' || $uri === '/dashboard') {
     $c = new JournalController(); $c->index();
 } 
-
+// --- CHECKS (Bank) ---
+elseif ($uri === '/bank/checks') {
+    $c = new CheckController(); $c->index();
+}
+elseif ($uri === '/bank/checks/create') {
+    $c = new CheckController(); $c->create();
+}
+elseif ($uri === '/bank/checks/store') {
+    $c = new CheckController(); $c->store();
+}
+elseif ($uri === '/bank/checks/status') {
+    $c = new CheckController(); $c->updateStatus();
+}
 // --- EXPENSES: PURCHASES ---
 elseif ($uri === '/expenses/purchases') {
     $c = new PurchaseController(); $c->index();

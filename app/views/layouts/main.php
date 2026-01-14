@@ -48,7 +48,9 @@
             <a href="/dashboard" class="nav-link active"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
             
             <div class="nav-header">Bank & Cash</div>
-            <a href="/bank/checks" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Checks</a>
+            <<a href="/bank/checks" class="nav-link <?php echo (strpos($uri, '/bank/checks') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-money-check"></i> Checks
+            </a>
             <a href="/bank/passbooks" class="nav-link"><i class="fa-solid fa-book"></i> Passbooks</a>
             <a href="/bank/cash-on-hand" class="nav-link"><i class="fa-solid fa-wallet"></i> Cash On Hand</a>
             <a href="/bank/transfers" class="nav-link"><i class="fa-solid fa-arrow-right-arrow-left"></i> Fund Transfers</a>
