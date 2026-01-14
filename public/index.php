@@ -122,7 +122,16 @@ elseif ($uri === '/expenses/bill-payments/create') {
 elseif ($uri === '/expenses/bill-payments/store') {
     $c = new BillPaymentController(); $c->store();
 }
-
+// --- EXPENSES: LOANS ---
+elseif ($uri === '/expenses/loans') {
+    $c = new LoanController(); $c->index();
+}
+elseif ($uri === '/expenses/loans/create') {
+    $c = new LoanController(); $c->create();
+}
+elseif ($uri === '/expenses/loans/store') {
+    $c = new LoanController(); $c->store();
+}
 // --- BANK & CASH ---
 elseif (strpos($uri, '/bank/passbooks') === 0) {
     $c = new BankController();
