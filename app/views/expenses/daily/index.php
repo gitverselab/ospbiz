@@ -1,44 +1,53 @@
-<form method="GET" action="/expenses/daily" class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-    <div class="flex-1 w-full bg-white p-4 rounded-lg shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold text-gray-800">Daily Expenses</h2>
+    <button onclick="openModal()" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 font-medium">
+        <i class="fa-solid fa-plus mr-2"></i> Add Expense
+    </button>
+</div>
+
+<form method="GET" action="/expenses/daily" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
+    <div class="flex flex-col md:flex-row gap-4 items-end">
         
-        <div>
+        <div class="flex-1 w-full">
             <label class="text-xs font-bold text-gray-500 uppercase">Search</label>
-            <input type="text" name="search" value="<?php echo htmlspecialchars($_GET['search'] ?? ''); ?>" placeholder="Description..." class="w-full border p-2 rounded text-sm">
+            <input type="text" name="search" value="<?php echo htmlspecialchars($filters['search']); ?>" placeholder="Description..." class="w-full border p-2 rounded text-sm">
         </div>
 
-        <div>
+        <div class="w-full md:w-48">
             <label class="text-xs font-bold text-gray-500 uppercase">Category</label>
             <select name="category" class="w-full border p-2 rounded text-sm bg-white">
                 <option value="">All Categories</option>
                 <?php foreach($categories as $cat): ?>
-                    <option value="<?php echo $cat['id']; ?>" <?php echo (isset($_GET['category']) && $_GET['category'] == $cat['id']) ? 'selected' : ''; ?>>
+                    <option value="<?php echo $cat['id']; ?>" <?php echo ($filters['category'] == $cat['id']) ? 'selected' : ''; ?>>
                         <?php echo htmlspecialchars($cat['name']); ?>
                     </option>
                 <?php endforeach; ?>
             </select>
         </div>
 
-        <div class="flex gap-2">
-            <div class="w-1/2">
-                <label class="text-xs font-bold text-gray-500 uppercase">From</label>
-                <input type="date" name="from" value="<?php echo htmlspecialchars($_GET['from'] ?? ''); ?>" class="w-full border p-2 rounded text-sm">
-            </div>
-            <div class="w-1/2">
-                <label class="text-xs font-bold text-gray-500 uppercase">To</label>
-                <input type="date" name="to" value="<?php echo htmlspecialchars($_GET['to'] ?? ''); ?>" class="w-full border p-2 rounded text-sm">
-            </div>
+        <div class="w-full md:w-32">
+            <label class="text-xs font-bold text-gray-500 uppercase">From</label>
+            <input type="date" name="from" value="<?php echo htmlspecialchars($filters['from']); ?>" class="w-full border p-2 rounded text-sm">
+        </div>
+        <div class="w-full md:w-32">
+            <label class="text-xs font-bold text-gray-500 uppercase">To</label>
+            <input type="date" name="to" value="<?php echo htmlspecialchars($filters['to']); ?>" class="w-full border p-2 rounded text-sm">
+        </div>
+
+        <div class="w-full md:w-24">
+            <label class="text-xs font-bold text-gray-500 uppercase">Show</label>
+            <select name="limit" class="w-full border p-2 rounded text-sm bg-white">
+                <option value="10" <?php echo ($filters['limit'] == 10) ? 'selected' : ''; ?>>10</option>
+                <option value="25" <?php echo ($filters['limit'] == 25) ? 'selected' : ''; ?>>25</option>
+                <option value="50" <?php echo ($filters['limit'] == 50) ? 'selected' : ''; ?>>50</option>
+                <option value="100" <?php echo ($filters['limit'] == 100) ? 'selected' : ''; ?>>100</option>
+            </select>
         </div>
 
         <div class="flex gap-2">
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700 w-full">Filter</button>
-            <a href="/expenses/daily" class="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-medium hover:bg-gray-300 flex items-center justify-center w-full">Reset</a>
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700">Filter</button>
+            <a href="/expenses/daily" class="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-medium hover:bg-gray-300 flex items-center">Reset</a>
         </div>
-    </div>
-
-    <div class="flex gap-2 shrink-0 self-start md:self-center">
-        <button type="button" onclick="openModal()" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 text-sm font-bold">
-            <i class="fa-solid fa-plus mr-2"></i> Add New Expense
-        </button>
     </div>
 </form>
 
@@ -56,7 +65,7 @@
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
             <?php if(empty($expenses)): ?>
-                <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">No expenses found matching your criteria.</td></tr>
+                <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 italic">No expenses found matching your criteria.</td></tr>
             <?php else: ?>
                 <?php foreach ($expenses as $e): ?>
                 <tr class="hover:bg-gray-50">
@@ -81,7 +90,9 @@
                     
                     <td class="px-6 py-4 text-center text-sm">
                         <?php if ($e['is_pending_change']): ?>
-                            <button onclick='openSettleModal(<?php echo json_encode($e); ?>)' class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 shadow-sm">Settle Change</button>
+                            <button onclick='openSettleModal(<?php echo json_encode($e); ?>)' class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 shadow-sm">
+                                Settle Change
+                            </button>
                         <?php else: ?>
                             <span class="text-gray-400 text-xs">Completed</span>
                         <?php endif; ?>
@@ -95,15 +106,34 @@
 
 <div class="flex justify-between items-center mt-4">
     <div class="text-sm text-gray-500">
-        Page <?php echo $page; ?> of <?php echo $totalPages; ?> (Total <?php echo $totalRecords; ?>)
+        Showing Page <?php echo $filters['page']; ?> of <?php echo $filters['total_pages']; ?> 
+        (Total <?php echo $filters['total_records']; ?> records)
     </div>
+    
     <div class="flex gap-2">
-        <?php if ($page > 1): ?>
-            <a href="?page=<?php echo $page - 1; ?>&search=<?php echo $_GET['search']??''; ?>&from=<?php echo $_GET['from']??''; ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Previous</a>
+        <?php 
+            // Build base URL keeping current filters
+            $params = $_GET; 
+            unset($params['page']); 
+            $baseUrl = '?' . http_build_query($params) . '&page=';
+        ?>
+
+        <?php if ($filters['page'] > 1): ?>
+            <a href="<?php echo $baseUrl . ($filters['page'] - 1); ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Previous</a>
+        <?php else: ?>
+            <span class="px-3 py-1 bg-gray-100 border rounded text-gray-400 text-sm cursor-not-allowed">Previous</span>
         <?php endif; ?>
 
-        <?php if ($page < $totalPages): ?>
-            <a href="?page=<?php echo $page + 1; ?>&search=<?php echo $_GET['search']??''; ?>&from=<?php echo $_GET['from']??''; ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Next</a>
+        <?php for($i = 1; $i <= $filters['total_pages']; $i++): ?>
+            <a href="<?php echo $baseUrl . $i; ?>" class="px-3 py-1 border rounded text-sm <?php echo ($i == $filters['page']) ? 'bg-blue-600 text-white' : 'bg-white hover:bg-gray-50'; ?>">
+                <?php echo $i; ?>
+            </a>
+        <?php endfor; ?>
+
+        <?php if ($filters['page'] < $filters['total_pages']): ?>
+            <a href="<?php echo $baseUrl . ($filters['page'] + 1); ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Next</a>
+        <?php else: ?>
+            <span class="px-3 py-1 bg-gray-100 border rounded text-gray-400 text-sm cursor-not-allowed">Next</span>
         <?php endif; ?>
     </div>
 </div>
@@ -181,6 +211,38 @@
     </div>
 </div>
 
+<div id="settleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-sm">
+        <div class="px-6 py-4 border-b border-gray-200 bg-blue-50 rounded-t-lg">
+            <h3 class="font-bold text-lg text-blue-900">Settle Transaction</h3>
+        </div>
+        
+        <form action="/expenses/daily/settle" method="POST" class="p-6 space-y-4">
+            <input type="hidden" name="id" id="settleId">
+            
+            <div class="bg-gray-100 p-3 rounded text-sm text-gray-600 mb-4">
+                We originally released <span class="font-bold text-gray-900" id="settleTenderedDisplay">₱0.00</span>. 
+                Please enter the actual expense from the receipt.
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Final Actual Expense</label>
+                <input type="number" step="0.01" name="final_actual_amount" id="settleActual" oninput="calcReturn()" class="w-full border-gray-300 rounded shadow-sm border p-2 text-xl font-bold text-gray-800" required>
+            </div>
+
+            <div class="text-right">
+                <div class="text-xs text-gray-500 uppercase">Change to Return</div>
+                <div class="text-2xl font-bold text-green-600" id="settleReturn">₱0.00</div>
+            </div>
+
+            <div class="pt-4 flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('settleModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Confirm Settle</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 // Pass PHP data to JS
 const allAccounts = <?php echo json_encode($allFinancialAccounts); ?>;
@@ -206,37 +268,55 @@ function filterAccounts() {
         select.appendChild(option);
     });
 
-    // 2. Hide "Change Calculator" if Bank is selected (Banks don't give loose change)
+    // 2. Hide "Change Calculator" if Bank is selected
     if (type === 'bank') {
         calc.style.display = 'none';
-        // Reset calculator values to prevent errors
         document.getElementById('toggleChange').checked = false;
         document.getElementById('tenderedAmount').value = '';
     } else {
         calc.style.display = 'block';
     }
 }
-function toggleCalculator(){ 
+
+function toggleCalculator() {
     const isChecked = document.getElementById('toggleChange').checked;
-    document.getElementById('actualSection').classList.toggle('hidden', isChecked);
+    const actualSection = document.getElementById('actualSection');
+    
+    if (isChecked) {
+        actualSection.classList.add('hidden'); 
+        document.getElementById('actualAmount').value = 0;
+    } else {
+        actualSection.classList.remove('hidden');
+    }
     calculateChange();
 }
-function calculateChange(){
-    const tendered = parseFloat(document.getElementById('tenderedAmount').value)||0;
-    const actual = parseFloat(document.getElementById('actualAmount').value)||0;
-    if(!document.getElementById('toggleChange').checked && tendered > 0) {
-        document.getElementById('changeDisplay').innerText = "Change: ₱" + (tendered - actual).toFixed(2);
-    } else { document.getElementById('changeDisplay').innerText = ""; }
+
+function calculateChange() {
+    const tendered = parseFloat(document.getElementById('tenderedAmount').value) || 0;
+    const actual = parseFloat(document.getElementById('actualAmount').value) || 0;
+    const isChecked = document.getElementById('toggleChange').checked;
+    
+    if (!isChecked && tendered > 0) {
+        let change = tendered - actual;
+        document.getElementById('changeDisplay').innerText = "Change: ₱" + change.toLocaleString('en-US', {minimumFractionDigits: 2});
+    } else {
+        document.getElementById('changeDisplay').innerText = "";
+    }
 }
-function openSettleModal(data){
+
+function openSettleModal(data) {
     document.getElementById('settleModal').classList.remove('hidden');
     document.getElementById('settleId').value = data.id;
-    document.getElementById('settleTenderedDisplay').innerText = '₱'+parseFloat(data.tendered_amount).toLocaleString();
+    document.getElementById('settleTenderedDisplay').innerText = '₱' + parseFloat(data.tendered_amount).toLocaleString('en-US');
     document.getElementById('settleActual').dataset.tendered = data.tendered_amount;
+    document.getElementById('settleActual').value = '';
+    document.getElementById('settleReturn').innerText = '₱0.00';
 }
-function calcReturn(){
-    const tendered = parseFloat(document.getElementById('settleActual').dataset.tendered)||0;
-    const actual = parseFloat(document.getElementById('settleActual').value)||0;
-    document.getElementById('settleReturn').innerText = '₱'+(tendered - actual).toFixed(2);
+
+function calcReturn() {
+    const tendered = parseFloat(document.getElementById('settleActual').dataset.tendered) || 0;
+    const actual = parseFloat(document.getElementById('settleActual').value) || 0;
+    const change = tendered - actual;
+    document.getElementById('settleReturn').innerText = '₱' + change.toLocaleString('en-US', {minimumFractionDigits: 2});
 }
 </script>

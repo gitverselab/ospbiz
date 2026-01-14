@@ -4,14 +4,20 @@ class DailyExpenseController {
     public function index() {
         $db = Database::getInstance();
         
-        // 1. FILTERING
+        // --- 1. GET PARAMETERS ---
         $search = $_GET['search'] ?? '';
         $fromDate = $_GET['from'] ?? '';
         $toDate = $_GET['to'] ?? '';
-        $categoryId = $_GET['category'] ?? ''; // NEW: Get Category ID
+        $categoryId = $_GET['category'] ?? '';
         
-        // Base Query
-        $whereSql = "t.type = 'credit'"; 
+        // Pagination Settings
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10; // Default 10 lines
+        $offset = ($page - 1) * $limit;
+
+        // --- 2. BUILD QUERY ---
+        // Base: Credit transactions on Cash accounts
+        $whereSql = "fa.type = 'cash' AND t.type = 'credit'";
         $params = [];
 
         // Apply Filters
@@ -28,16 +34,12 @@ class DailyExpenseController {
             $whereSql .= " AND t.date <= ?";
             $params[] = $toDate;
         }
-        if ($categoryId) { // NEW: Apply Category Filter
+        if ($categoryId) {
             $whereSql .= " AND t.contra_account_id = ?";
             $params[] = $categoryId;
         }
 
-        // 2. PAGINATION (Keep same logic)
-        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-        $limit = 10;
-        $offset = ($page - 1) * $limit;
-
+        // --- 3. COUNT TOTAL (For Pagination) ---
         $countSql = "SELECT COUNT(*) as total 
                      FROM account_transactions t
                      JOIN financial_accounts fa ON t.financial_account_id = fa.id
@@ -47,8 +49,8 @@ class DailyExpenseController {
         $totalRecords = $stmtCount->fetch()['total'];
         $totalPages = ceil($totalRecords / $limit);
 
-        // 3. FETCH DATA
-        $sql = "SELECT t.*, fa.name as source_account, fa.type as account_type, a.name as category_name 
+        // --- 4. FETCH DATA ---
+        $sql = "SELECT t.*, fa.name as source_account, a.name as category_name 
                 FROM account_transactions t
                 JOIN financial_accounts fa ON t.financial_account_id = fa.id
                 LEFT JOIN accounts a ON t.contra_account_id = a.id
@@ -60,9 +62,22 @@ class DailyExpenseController {
         $stmt->execute($params);
         $expenses = $stmt->fetchAll();
 
-        // 4. DROPDOWNS
+        // --- 5. DROPDOWNS ---
         $allFinancialAccounts = $db->query("SELECT * FROM financial_accounts ORDER BY type, name")->fetchAll();
         $categories = $db->query("SELECT * FROM accounts WHERE type IN ('expense', 'asset', 'liability') ORDER BY code ASC")->fetchAll();
+        $cashAccounts = $db->query("SELECT * FROM financial_accounts WHERE type='cash'")->fetchAll(); // For the Add Modal
+
+        // Pass filters back to view
+        $filters = [
+            'search' => $search, 
+            'from' => $fromDate, 
+            'to' => $toDate, 
+            'category' => $categoryId,
+            'limit' => $limit,
+            'page' => $page,
+            'total_pages' => $totalPages,
+            'total_records' => $totalRecords
+        ];
 
         $pageTitle = "Daily Expenses";
         $childView = ROOT_PATH . '/app/views/expenses/daily/index.php';

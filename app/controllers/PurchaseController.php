@@ -3,11 +3,75 @@ class PurchaseController {
 
     public function index() {
         $db = Database::getInstance();
+        
+        // --- 1. GET PARAMETERS ---
+        $search = $_GET['search'] ?? '';
+        $fromDate = $_GET['from'] ?? '';
+        $toDate = $_GET['to'] ?? '';
+        $status = $_GET['status'] ?? '';
+        
+        // Pagination Settings
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10; // Default 10 lines
+        $offset = ($page - 1) * $limit;
+
+        // --- 2. BUILD QUERY ---
+        // Base Condition
+        $whereSql = "1=1"; 
+        $params = [];
+
+        // Apply Filters
+        if ($search) {
+            $whereSql .= " AND (po.po_number LIKE ? OR s.name LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+        if ($fromDate) {
+            $whereSql .= " AND po.date >= ?";
+            $params[] = $fromDate;
+        }
+        if ($toDate) {
+            $whereSql .= " AND po.date <= ?";
+            $params[] = $toDate;
+        }
+        if ($status) {
+            $whereSql .= " AND po.status = ?";
+            $params[] = $status;
+        }
+
+        // --- 3. COUNT TOTAL (For Pagination) ---
+        $countSql = "SELECT COUNT(*) as total 
+                     FROM purchase_orders po
+                     LEFT JOIN suppliers s ON po.supplier_id = s.id
+                     WHERE $whereSql";
+        $stmtCount = $db->prepare($countSql);
+        $stmtCount->execute($params);
+        $totalRecords = $stmtCount->fetch()['total'];
+        $totalPages = ceil($totalRecords / $limit);
+
+        // --- 4. FETCH DATA ---
         $sql = "SELECT po.*, s.name as supplier_name 
                 FROM purchase_orders po
                 LEFT JOIN suppliers s ON po.supplier_id = s.id
-                ORDER BY po.date DESC";
-        $pos = $db->query($sql)->fetchAll();
+                WHERE $whereSql
+                ORDER BY po.date DESC, po.id DESC
+                LIMIT $limit OFFSET $offset";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $pos = $stmt->fetchAll();
+
+        // Pass all filter data back to view so inputs stay filled
+        $filters = [
+            'search' => $search, 
+            'from' => $fromDate, 
+            'to' => $toDate, 
+            'status' => $status,
+            'limit' => $limit,
+            'page' => $page,
+            'total_pages' => $totalPages,
+            'total_records' => $totalRecords
+        ];
 
         $pageTitle = "Purchase Orders";
         $childView = ROOT_PATH . '/app/views/expenses/purchases/index.php';
