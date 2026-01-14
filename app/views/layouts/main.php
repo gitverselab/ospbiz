@@ -55,11 +55,30 @@
             <a href="/bank/calendar" class="nav-link"><i class="fa-solid fa-calendar-days"></i> Calendar</a>
 
             <div class="nav-header">Expenses</div>
-            <a href="/expenses/petty-cash" class="nav-link"><i class="fa-solid fa-coins"></i> Petty Cash</a>
-            <a href="/expenses/purchases" class="nav-link"><i class="fa-solid fa-cart-shopping"></i> Purchases</a>
-            <a href="/expenses/bills" class="nav-link"><i class="fa-solid fa-file-invoice"></i> Bills</a>
-            <a href="/expenses/recurring" class="nav-link"><i class="fa-solid fa-arrows-rotate"></i> Recurring Bills</a>
-            <a href="/expenses/loans" class="nav-link"><i class="fa-solid fa-building-columns"></i> Credits/Loans</a>
+            
+            <a href="/bank/cash-on-hand" class="nav-link <?php echo ($uri === '/bank/cash-on-hand') ? 'active' : ''; ?>">
+                <i class="fa-solid fa-coins"></i> Petty Cash
+            </a>
+
+            <a href="/expenses/purchases" class="nav-link <?php echo (strpos($uri, '/expenses/purchases') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-cart-shopping"></i> Purchase Orders
+            </a>
+
+            <a href="/expenses/payments" class="nav-link <?php echo (strpos($uri, '/expenses/payments') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-money-bill-transfer"></i> Purchase Payments
+            </a>
+
+            <a href="/expenses/bills" class="nav-link <?php echo (strpos($uri, '/expenses/bills') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-file-invoice"></i> Bills
+            </a>
+
+            <a href="/expenses/recurring" class="nav-link">
+                <i class="fa-solid fa-arrows-rotate"></i> Recurring Bills
+            </a>
+
+            <a href="/expenses/loans" class="nav-link">
+                <i class="fa-solid fa-building-columns"></i> Credits/Loans
+            </a>
 
             <div class="nav-header">Revenue</div>
             <a href="/revenue/delivery" class="nav-link"><i class="fa-solid fa-truck"></i> Delivery Receipts</a>

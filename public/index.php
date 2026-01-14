@@ -83,6 +83,20 @@ elseif ($uri === '/bank/cash-on-hand/view') {
 elseif ($uri === '/bank/cash-on-hand/transaction') {
     $controller = new CashController();
     $controller->storeTransaction();
+}
+// PURCHASES
+elseif ($uri === '/expenses/purchases') {
+    $c = new PurchaseController(); $c->index();
+}
+elseif ($uri === '/expenses/purchases/create') {
+    $c = new PurchaseController(); $c->create();
+}
+// PURCHASE PAYMENTS
+elseif ($uri === '/expenses/payments') {
+    $c = new PurchasePaymentController(); $c->index();
+}
+elseif ($uri === '/expenses/payments/create') {
+    $c = new PurchasePaymentController(); $c->create();
 } 
 elseif ($uri === '/journal/create') {
     $controller = new JournalController();
