@@ -27,17 +27,23 @@
         .nav-link i { width: 20px; text-align: center; margin-right: 10px; }
     </style>
 </head>
-<body class="h-screen flex overflow-hidden">
+<body class="h-screen flex overflow-hidden bg-gray-50">
 
-    <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-2xl z-10 h-full">
+    <div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden transition-opacity opacity-0"></div>
+
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-white flex flex-col shadow-2xl h-full transform -translate-x-full transition-transform duration-300 ease-in-out md:relative md:translate-x-0">
         
-        <div class="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800 shrink-0">
-            <i class="fa-solid fa-cube text-blue-500 text-xl mr-3"></i>
-            <span class="font-bold text-lg tracking-wide">OSP Accounting</span>
+        <div class="h-16 flex items-center justify-between px-6 bg-slate-950 border-b border-slate-800 shrink-0">
+            <div class="flex items-center">
+                <i class="fa-solid fa-cube text-blue-500 text-xl mr-3"></i>
+                <span class="font-bold text-lg tracking-wide">OSP Accounting</span>
+            </div>
+            <button onclick="toggleSidebar()" class="md:hidden text-gray-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
         </div>
 
         <nav class="flex-1 overflow-y-auto nav-scroll py-4">
-            
             <div class="nav-header">Management</div>
             <a href="/dashboard" class="nav-link active"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
             
@@ -92,10 +98,18 @@
     </aside>
 
     <main class="flex-1 flex flex-col min-w-0 overflow-hidden bg-gray-50">
-        <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-8 shadow-sm shrink-0 z-0">
-            <h2 class="text-xl font-bold text-gray-800">
-                <?php echo isset($pageTitle) ? $pageTitle : 'Financial Dashboard'; ?>
-            </h2>
+        <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 md:px-8 shadow-sm shrink-0 z-0">
+            
+            <div class="flex items-center gap-4">
+                <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-gray-700 focus:outline-none">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+
+                <h2 class="text-lg md:text-xl font-bold text-gray-800 truncate">
+                    <?php echo isset($pageTitle) ? $pageTitle : 'Financial Dashboard'; ?>
+                </h2>
+            </div>
+
             <div class="flex gap-4">
                 <div class="text-right hidden md:block">
                     <div class="text-xs text-gray-500">Current Date</div>
@@ -107,7 +121,7 @@
             </div>
         </header>
 
-        <div class="flex-1 overflow-y-auto p-6">
+        <div class="flex-1 overflow-y-auto p-4 md:p-6">
             <?php 
             if (isset($childView) && file_exists($childView)) {
                 include $childView;
@@ -121,5 +135,27 @@
             ?>
         </div>
     </main>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            
+            // Toggle sidebar position
+            if (sidebar.classList.contains('-translate-x-full')) {
+                // Open Sidebar
+                sidebar.classList.remove('-translate-x-full');
+                // Show Overlay
+                overlay.classList.remove('hidden');
+                setTimeout(() => overlay.classList.remove('opacity-0'), 10); // Fade in
+            } else {
+                // Close Sidebar
+                sidebar.classList.add('-translate-x-full');
+                // Hide Overlay
+                overlay.classList.add('opacity-0');
+                setTimeout(() => overlay.classList.add('hidden'), 300); // Wait for fade out
+            }
+        }
+    </script>
 </body>
 </html>
