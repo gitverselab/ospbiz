@@ -117,13 +117,8 @@ elseif ($uri === '/settings/customers/create') {
     $c = new ContactController(); $c->createCustomer();
 }
 
-// --- AUDIT ---
-elseif ($uri === '/audit/logs') {
-    $c = new AuditController(); $c->index();
-}
-
 // --- CATCH ALL (Under Construction) ---
-// THIS MUST BE THE LAST 'ELSEIF' TO PREVENT BLOCKING OTHER PAGES
+// THIS MUST BE LAST
 elseif (preg_match('#^/(bank|expenses|revenue|settings|admin)#', $uri)) {
     $pageTitle = "Work In Progress";
     require_once ROOT_PATH . '/app/views/layouts/main.php';

@@ -1,73 +1,91 @@
-<form action="/expenses/purchases/create" method="POST" id="poForm" class="bg-white p-6 rounded shadow">
-    <div class="grid grid-cols-3 gap-6 mb-6">
+<form action="/expenses/purchases/create" method="POST" class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-sm border border-gray-200">
+    <div class="flex justify-between items-center mb-6 border-b pb-4">
+        <h2 class="text-xl font-bold text-gray-800">New Purchase Order</h2>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <div>
-            <label class="block text-xs font-bold text-gray-500 uppercase">Supplier</label>
-            <select name="supplier_id" class="w-full border p-2 rounded" required>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Supplier</label>
+            <select name="supplier_id" class="w-full border p-2 rounded bg-white" required>
+                <option value="">Select Supplier...</option>
                 <?php foreach($suppliers as $s): ?>
-                    <option value="<?= $s['id'] ?>"><?= $s['name'] ?></option>
+                    <option value="<?php echo $s['id']; ?>"><?php echo htmlspecialchars($s['name']); ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
         <div>
-            <label class="block text-xs font-bold text-gray-500 uppercase">PO Number</label>
-            <input type="text" name="po_number" class="w-full border p-2 rounded" required>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">PO Number</label>
+            <input type="text" name="po_number" class="w-full border p-2 rounded" placeholder="e.g. PO-2023-001" required>
         </div>
         <div>
-            <label class="block text-xs font-bold text-gray-500 uppercase">Date</label>
-            <input type="date" name="date" value="<?= date('Y-m-d') ?>" class="w-full border p-2 rounded">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
+            <input type="date" name="date" value="<?php echo date('Y-m-d'); ?>" class="w-full border p-2 rounded">
         </div>
     </div>
 
-    <table class="w-full mb-4">
-        <thead class="bg-gray-50">
+    <h3 class="font-bold text-gray-700 mb-2">Items</h3>
+    <table class="w-full mb-6 border-collapse">
+        <thead class="bg-gray-50 border-b">
             <tr>
-                <th class="text-left p-2">Description / Item</th>
-                <th class="text-right p-2 w-24">Qty</th>
-                <th class="text-right p-2 w-32">Unit Price</th>
-                <th class="text-right p-2 w-32">Total</th>
+                <th class="text-left p-2 text-xs font-bold text-gray-500 uppercase">Item Description</th>
+                <th class="text-right p-2 text-xs font-bold text-gray-500 uppercase w-24">Qty</th>
+                <th class="text-right p-2 text-xs font-bold text-gray-500 uppercase w-32">Unit Price</th>
+                <th class="text-right p-2 text-xs font-bold text-gray-500 uppercase w-32">Total</th>
                 <th class="w-10"></th>
             </tr>
         </thead>
-        <tbody id="poLines"></tbody>
+        <tbody id="poLines">
+            </tbody>
     </table>
     
-    <button type="button" onclick="addLine()" class="text-blue-600 text-sm font-bold mb-6">+ Add Item</button>
+    <button type="button" onclick="addLine()" class="text-blue-600 text-sm font-bold hover:underline mb-6">
+        <i class="fa-solid fa-plus-circle"></i> Add Item Line
+    </button>
 
-    <input type="hidden" name="lines_json" id="linesJson">
-    <div class="text-right">
-        <button type="submit" onclick="prepareSubmit()" class="bg-blue-600 text-white px-6 py-2 rounded">Create PO</button>
+    <div class="flex justify-end items-center border-t pt-4">
+        <div class="mr-6 text-right">
+            <div class="text-xs text-gray-500 uppercase">Grand Total</div>
+            <div class="text-2xl font-bold text-gray-800" id="grandTotalDisplay">₱0.00</div>
+        </div>
+        <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded font-bold hover:bg-blue-700 shadow">
+            Save Purchase Order
+        </button>
     </div>
 </form>
 
 <script>
 function addLine() {
     const tr = document.createElement('tr');
+    tr.className = "border-b hover:bg-gray-50";
     tr.innerHTML = `
-        <td class="p-1"><input class="w-full border p-1" name="desc" placeholder="Item name"></td>
-        <td class="p-1"><input class="w-full border p-1 text-right" type="number" name="qty" value="1" oninput="calcRow(this)"></td>
-        <td class="p-1"><input class="w-full border p-1 text-right" type="number" name="price" value="0" oninput="calcRow(this)"></td>
-        <td class="p-1 text-right font-bold row-total">0.00</td>
-        <td class="p-1 text-center"><button type="button" onclick="this.closest('tr').remove()" class="text-red-500">x</button></td>
+        <td class="p-2"><input class="w-full border p-1 rounded text-sm" name="desc" placeholder="Enter item name..." required></td>
+        <td class="p-2"><input class="w-full border p-1 rounded text-sm text-right qty" type="number" step="0.01" value="1" oninput="calcRow(this)" required></td>
+        <td class="p-2"><input class="w-full border p-1 rounded text-sm text-right price" type="number" step="0.01" value="0" oninput="calcRow(this)" required></td>
+        <td class="p-2 text-right font-bold text-gray-700 row-total">0.00</td>
+        <td class="p-2 text-center"><button type="button" onclick="this.closest('tr').remove(); calcTotal();" class="text-red-400 hover:text-red-600"><i class="fa-solid fa-times"></i></button></td>
     `;
     document.getElementById('poLines').appendChild(tr);
 }
+
 function calcRow(el) {
     const row = el.closest('tr');
-    const q = parseFloat(row.querySelector('[name="qty"]').value) || 0;
-    const p = parseFloat(row.querySelector('[name="price"]').value) || 0;
-    row.querySelector('.row-total').innerText = (q * p).toFixed(2);
+    const qty = parseFloat(row.querySelector('.qty').value) || 0;
+    const price = parseFloat(row.querySelector('.price').value) || 0;
+    const total = qty * price;
+    row.querySelector('.row-total').innerText = total.toLocaleString('en-US', {minimumFractionDigits: 2});
+    calcTotal();
 }
-function prepareSubmit() {
-    const lines = [];
+
+function calcTotal() {
+    let grandTotal = 0;
     document.querySelectorAll('#poLines tr').forEach(row => {
-        lines.push({
-            description: row.querySelector('[name="desc"]').value,
-            quantity: row.querySelector('[name="qty"]').value,
-            unit_price: row.querySelector('[name="price"]').value,
-            amount: row.querySelector('.row-total').innerText
-        });
+        const qty = parseFloat(row.querySelector('.qty').value) || 0;
+        const price = parseFloat(row.querySelector('.price').value) || 0;
+        grandTotal += (qty * price);
     });
-    document.getElementById('linesJson').value = JSON.stringify(lines);
+    document.getElementById('grandTotalDisplay').innerText = '₱' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2});
 }
+
+// Initialize with one empty line
 addLine();
 </script>
