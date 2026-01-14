@@ -4,13 +4,18 @@ class Database {
     private $pdo;
 
     private function __construct() {
-        // Updated with your specific credentials
-        $host = 'localhost';
-        $db   = 'u539825091_ospbiz';
-        $user = 'u539825091_ospbiz';
-        $pass = 'B@dw0lfz'; // ⚠️ Security Warning: See note below
+        // Load credentials from environment variables
+        $host = getenv('DB_HOST') ?: 'localhost';
+        $db   = getenv('DB_NAME');
+        $user = getenv('DB_USER');
+        $pass = getenv('DB_PASS');
+        $charset = getenv('DB_CHARSET') ?: 'utf8mb4';
 
-        $dsn = "mysql:host=$host;dbname=$db;charset=utf8mb4";
+        if (!$db || !$user) {
+            die("Database configuration is missing. Check your .env file.");
+        }
+
+        $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
         $options = [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -20,7 +25,7 @@ class Database {
         try {
             $this->pdo = new PDO($dsn, $user, $pass, $options);
         } catch (PDOException $e) {
-            // Log error to file instead of showing to user for security
+            // Log error privately
             error_log("DB Connection Failed: " . $e->getMessage());
             die("Database connection failed. Please check logs.");
         }

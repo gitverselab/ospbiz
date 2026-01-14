@@ -1,5 +1,24 @@
 <?php
+// Start Session
 session_start();
+
+// Define Root Path
+define('ROOT_PATH', dirname(__DIR__));
+
+// Require the Env loader manually
+require_once ROOT_PATH . '/app/core/Env.php';
+
+// Load Environment Variables
+try {
+    Env::load(ROOT_PATH . '/.env');
+} catch (Exception $e) {
+    die($e->getMessage());
+}
+
+// Now you can require other core files or your autoloader
+require_once ROOT_PATH . '/app/core/Database.php';
+
+// ... Router and Controller Logic continues below ...
 // Simple Router
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
