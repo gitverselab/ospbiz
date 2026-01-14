@@ -89,6 +89,9 @@
             <a href="/expenses/loans" class="nav-link <?php echo (strpos($uri, '/expenses/loans') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-building-columns"></i> Credits/Loans
             </a>
+            <a href="/expenses/loan-payments" class="nav-link <?php echo (strpos($uri, '/expenses/loan-payments') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-money-bill-wave"></i> Loan Payments
+            </a>
 
             <div class="nav-header">Revenue</div>
             <a href="/revenue/delivery" class="nav-link"><i class="fa-solid fa-truck"></i> Delivery Receipts</a>
