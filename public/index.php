@@ -27,12 +27,25 @@ spl_autoload_register(function ($class) {
 // 4. Load Env
 require_once ROOT_PATH . '/app/core/Env.php';
 try {
-    Env::load(ROOT_PATH . '/.env');
-} catch (Exception $e) { /* Ignore if missing for now */ }
+    if (file_exists(ROOT_PATH . '/.env')) {
+        Env::load(ROOT_PATH . '/.env');
+    }
+} catch (Exception $e) { /* Ignore if missing */ }
 
-// ... (Keep the top part of index.php same as before) ...
+// ==========================================
+// 5. ROUTER SETUP (THIS WAS MISSING)
+// ==========================================
 
-// ROUTING LOGIC
+// Get the URL path (e.g., "/journal/create")
+$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+// Optional: Handle sub-folder installation if not on root domain
+// $uri = str_replace('/ospbiz/public', '', $uri); 
+
+// ==========================================
+// 6. ROUTING LOGIC
+// ==========================================
+
 if ($uri === '/' || $uri === '/index.php' || $uri === '/dashboard') {
     $controller = new JournalController();
     $controller->index();
@@ -41,18 +54,18 @@ elseif ($uri === '/journal/create') {
     $controller = new JournalController();
     $controller->create();
 }
-// NEW: View Journals
 elseif ($uri === '/journal/list') {
     $controller = new JournalController();
     $controller->list();
 }
-// NEW: Audit Trail
 elseif ($uri === '/audit/logs') {
-    // Autoloader will load AuditController.php automatically
     $controller = new AuditController();
     $controller->index();
 }
 else {
     header("HTTP/1.0 404 Not Found");
-    echo "<h1 style='text-align:center;margin-top:50px'>404 Not Found</h1>";
+    echo "<div style='font-family:sans-serif; text-align:center; margin-top:50px;'>";
+    echo "<h1>404 Not Found</h1>";
+    echo "<p>The page <strong>" . htmlspecialchars($uri) . "</strong> does not exist.</p>";
+    echo "</div>";
 }
