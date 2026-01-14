@@ -16,9 +16,9 @@
         }
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
         
-        /* Custom Scrollbar for Sidebar */
-        aside::-webkit-scrollbar { width: 5px; }
-        aside::-webkit-scrollbar-thumb { background: #475569; border-radius: 5px; }
+        /* Custom Scrollbar for the Navigation Area only */
+        .nav-scroll::-webkit-scrollbar { width: 5px; }
+        .nav-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 5px; }
         
         .nav-header { font-size: 0.7rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-top: 1.5rem; margin-bottom: 0.5rem; padding-left: 1.5rem; }
         .nav-link { display: flex; align-items: center; padding: 0.75rem 1.5rem; color: #cbd5e1; transition: all 0.2s; font-size: 0.9rem; }
@@ -29,13 +29,14 @@
 </head>
 <body class="h-screen flex overflow-hidden">
 
-    <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-2xl overflow-y-auto z-10">
+    <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-2xl z-10 h-full">
+        
         <div class="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800 shrink-0">
             <i class="fa-solid fa-cube text-blue-500 text-xl mr-3"></i>
             <span class="font-bold text-lg tracking-wide">OSP Accounting</span>
         </div>
 
-        <nav class="flex-1 py-4">
+        <nav class="flex-1 overflow-y-auto nav-scroll py-4">
             
             <div class="nav-header">Management</div>
             <a href="/dashboard" class="nav-link active"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
@@ -111,7 +112,6 @@
             if (isset($childView) && file_exists($childView)) {
                 include $childView;
             } else {
-                // Fallback for missing pages
                 echo "<div class='flex flex-col items-center justify-center h-full text-gray-400'>
                         <i class='fa-solid fa-hammer text-6xl mb-4'></i>
                         <h2 class='text-2xl font-bold'>Under Construction</h2>
