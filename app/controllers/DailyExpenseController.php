@@ -4,12 +4,15 @@ class DailyExpenseController {
     public function index() {
         $db = Database::getInstance();
         
-        // 1. FILTERING
+        // 1. FILTERING (Keep existing logic)
         $search = $_GET['search'] ?? '';
         $fromDate = $_GET['from'] ?? '';
         $toDate = $_GET['to'] ?? '';
         
-        $whereSql = "fa.type = 'cash' AND t.type = 'credit'";
+        // NOTE: We removed "fa.type = 'cash'" from the filter so you can see Bank expenses too if you want.
+        // If you ONLY want to see Cash expenses in this list, change this line back to:
+        // $whereSql = "fa.type = 'cash' AND t.type = 'credit'";
+        $whereSql = "t.type = 'credit'"; 
         $params = [];
 
         if ($search) {
@@ -26,12 +29,11 @@ class DailyExpenseController {
             $params[] = $toDate;
         }
 
-        // 2. PAGINATION
+        // 2. PAGINATION (Keep existing logic)
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         $limit = 10;
         $offset = ($page - 1) * $limit;
 
-        // Count Total
         $countSql = "SELECT COUNT(*) as total 
                      FROM account_transactions t
                      JOIN financial_accounts fa ON t.financial_account_id = fa.id
@@ -42,7 +44,7 @@ class DailyExpenseController {
         $totalPages = ceil($totalRecords / $limit);
 
         // 3. FETCH DATA
-        $sql = "SELECT t.*, fa.name as source_account, a.name as category_name 
+        $sql = "SELECT t.*, fa.name as source_account, fa.type as account_type, a.name as category_name 
                 FROM account_transactions t
                 JOIN financial_accounts fa ON t.financial_account_id = fa.id
                 LEFT JOIN accounts a ON t.contra_account_id = a.id
@@ -54,9 +56,12 @@ class DailyExpenseController {
         $stmt->execute($params);
         $expenses = $stmt->fetchAll();
 
-        // 4. DROPDOWNS
-        $cashAccounts = $db->query("SELECT * FROM financial_accounts WHERE type='cash'")->fetchAll();
-        $categories = $db->query("SELECT * FROM accounts WHERE type IN ('expense', 'asset') ORDER BY name ASC")->fetchAll();
+        // 4. DROPDOWNS (UPDATED)
+        // Fetch ALL financial accounts (Bank & Cash) for the modal
+        $allFinancialAccounts = $db->query("SELECT * FROM financial_accounts ORDER BY type, name")->fetchAll();
+        
+        // Fetch Chart of Accounts (Expenses & Assets)
+        $categories = $db->query("SELECT * FROM accounts WHERE type IN ('expense', 'asset', 'liability') ORDER BY code ASC")->fetchAll();
 
         $pageTitle = "Daily Expenses";
         $childView = ROOT_PATH . '/app/views/expenses/daily/index.php';

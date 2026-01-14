@@ -93,49 +93,112 @@
 
 <div id="expenseModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
-        <div class="px-6 py-4 border-b border-gray-200"><h3 class="font-bold text-xl text-gray-800">Add New Expense</h3></div>
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="font-bold text-xl text-gray-800">Add New Expense</h3>
+        </div>
+        
         <form action="/expenses/daily/create" method="POST" class="p-6 space-y-4">
+            
             <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label><input type="date" name="date" value="<?php echo date('Y-m-d'); ?>" class="w-full border p-2 rounded text-sm"></div>
-                <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Pay From</label>
-                    <select name="financial_account_id" class="w-full border p-2 rounded text-sm bg-white">
-                        <?php foreach($cashAccounts as $acc): ?><option value="<?php echo $acc['id']; ?>"><?php echo htmlspecialchars($acc['name']); ?></option><?php endforeach; ?>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
+                    <input type="date" name="date" value="<?php echo date('Y-m-d'); ?>" class="w-full border p-2 rounded text-sm">
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Pay From</label>
+                    <select id="payFromType" class="w-full border p-2 rounded text-sm bg-white" onchange="filterAccounts()">
+                        <option value="cash">Cash on Hand</option>
+                        <option value="bank">Bank / Check</option>
                     </select>
                 </div>
             </div>
-            <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Category</label>
-                <select name="category_id" class="w-full border p-2 rounded text-sm bg-white">
-                    <?php foreach($categories as $cat): ?><option value="<?php echo $cat['id']; ?>"><?php echo htmlspecialchars($cat['name']); ?></option><?php endforeach; ?>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Source Account</label>
+                <select name="financial_account_id" id="sourceAccountSelect" class="w-full border p-2 rounded text-sm bg-white" required>
+                    </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Category (Chart of Accounts)</label>
+                <select name="category_id" class="w-full border p-2 rounded text-sm bg-white" required>
+                    <option value="">Select Category...</option>
+                    <?php foreach($categories as $cat): ?>
+                        <option value="<?php echo $cat['id']; ?>">
+                            <?php echo $cat['code'] . ' - ' . $cat['name']; ?>
+                        </option>
+                    <?php endforeach; ?>
                 </select>
             </div>
-            <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label><input type="text" name="description" class="w-full border p-2 rounded text-sm" required></div>
-            
-            <div class="p-4 bg-gray-50 border border-gray-200 rounded-md">
-                <div class="flex items-center mb-4"><input type="checkbox" name="is_pending_change" id="toggleChange" value="1" class="mr-2 h-4 w-4" onchange="toggleCalculator()"><label for="toggleChange" class="text-sm font-bold text-gray-700">Change will be given later?</label></div>
-                <div><label class="block text-xs font-bold text-gray-500 uppercase">Amount Given</label><input type="number" step="0.01" name="tendered_amount" id="tenderedAmount" oninput="calculateChange()" class="w-full border p-2 font-bold" placeholder="0.00"></div>
-                <div id="actualSection" class="mt-3"><label class="block text-xs font-bold text-gray-500 uppercase">Actual Cost</label><input type="number" step="0.01" name="actual_amount" id="actualAmount" oninput="calculateChange()" class="w-full border p-2 font-bold" placeholder="0.00"></div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
+                <input type="text" name="description" class="w-full border p-2 rounded text-sm" placeholder="Payee Name / Purpose" required>
+            </div>
+
+            <div id="calculatorContainer" class="p-4 bg-gray-50 border border-gray-200 rounded-md">
+                <div class="flex items-center mb-4">
+                    <input type="checkbox" name="is_pending_change" id="toggleChange" value="1" class="mr-2 h-4 w-4 text-blue-600 cursor-pointer" onchange="toggleCalculator()">
+                    <label for="toggleChange" class="text-sm font-bold text-gray-700 cursor-pointer select-none">Change will be given later?</label>
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase">Amount Given / Tendered</label>
+                    <input type="number" step="0.01" name="tendered_amount" id="tenderedAmount" oninput="calculateChange()" class="w-full border-gray-300 rounded shadow-sm border p-2 text-lg font-bold" placeholder="0.00">
+                </div>
+
+                <div id="actualSection" class="mt-3">
+                    <label class="block text-xs font-bold text-gray-500 uppercase">Actual Expense Cost</label>
+                    <input type="number" step="0.01" name="actual_amount" id="actualAmount" oninput="calculateChange()" class="w-full border-gray-300 rounded shadow-sm border p-2 text-lg font-bold" placeholder="0.00">
+                </div>
+                
                 <div class="text-right mt-2 text-sm font-bold text-green-600" id="changeDisplay"></div>
             </div>
-            <div class="pt-2 flex justify-end gap-3"><button type="button" onclick="document.getElementById('expenseModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded">Cancel</button><button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded font-bold">Save</button></div>
-        </form>
-    </div>
-</div>
 
-<div id="settleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-sm">
-        <div class="px-6 py-4 border-b border-gray-200 bg-blue-50 rounded-t-lg"><h3 class="font-bold text-lg text-blue-900">Settle Change</h3></div>
-        <form action="/expenses/daily/settle" method="POST" class="p-6 space-y-4">
-            <input type="hidden" name="id" id="settleId">
-            <div class="bg-gray-100 p-3 rounded text-sm text-gray-600 mb-4">Originally released <span class="font-bold text-gray-900" id="settleTenderedDisplay">₱0.00</span>. Enter actual expense.</div>
-            <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Final Actual Expense</label><input type="number" step="0.01" name="final_actual_amount" id="settleActual" oninput="calcReturn()" class="w-full border p-2 text-xl font-bold" required></div>
-            <div class="text-right"><div class="text-xs text-gray-500 uppercase">Change to Return</div><div class="text-2xl font-bold text-green-600" id="settleReturn">₱0.00</div></div>
-            <div class="pt-4 flex justify-end gap-3"><button type="button" onclick="document.getElementById('settleModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded">Cancel</button><button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded font-bold">Confirm</button></div>
+            <div class="pt-2 flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('expenseModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Save</button>
+            </div>
         </form>
     </div>
 </div>
 
 <script>
-function openModal(){ document.getElementById('expenseModal').classList.remove('hidden'); }
+// Pass PHP data to JS
+const allAccounts = <?php echo json_encode($allFinancialAccounts); ?>;
+
+function openModal() {
+    document.getElementById('expenseModal').classList.remove('hidden');
+    filterAccounts(); // Initialize dropdown
+}
+
+function filterAccounts() {
+    const type = document.getElementById('payFromType').value; // 'cash' or 'bank'
+    const select = document.getElementById('sourceAccountSelect');
+    const calc = document.getElementById('calculatorContainer');
+
+    // 1. Filter Dropdown Options
+    select.innerHTML = "";
+    const filtered = allAccounts.filter(acc => acc.type === type);
+    
+    filtered.forEach(acc => {
+        const option = document.createElement("option");
+        option.value = acc.id;
+        option.text = acc.name + " (Bal: ₱" + parseFloat(acc.current_balance).toLocaleString() + ")";
+        select.appendChild(option);
+    });
+
+    // 2. Hide "Change Calculator" if Bank is selected (Banks don't give loose change)
+    if (type === 'bank') {
+        calc.style.display = 'none';
+        // Reset calculator values to prevent errors
+        document.getElementById('toggleChange').checked = false;
+        document.getElementById('tenderedAmount').value = '';
+    } else {
+        calc.style.display = 'block';
+    }
+}
 function toggleCalculator(){ 
     const isChecked = document.getElementById('toggleChange').checked;
     document.getElementById('actualSection').classList.toggle('hidden', isChecked);
