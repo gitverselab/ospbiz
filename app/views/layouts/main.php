@@ -56,8 +56,8 @@
 
             <div class="nav-header">Expenses</div>
             
-            <a href="/bank/cash-on-hand" class="nav-link <?php echo ($uri === '/bank/cash-on-hand') ? 'active' : ''; ?>">
-                <i class="fa-solid fa-coins"></i> Petty Cash
+            <a href="/expenses/daily" class="nav-link <?php echo (strpos($uri, '/expenses/daily') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-wallet"></i> Daily Expenses
             </a>
 
             <a href="/expenses/purchases" class="nav-link <?php echo (strpos($uri, '/expenses/purchases') === 0) ? 'active' : ''; ?>">

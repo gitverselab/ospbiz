@@ -84,6 +84,14 @@ elseif ($uri === '/bank/cash-on-hand/transaction') {
     $controller = new CashController();
     $controller->storeTransaction();
 }
+// ... Previous Daily Expense Routes ...
+elseif ($uri === '/expenses/daily/create') {
+    $c = new DailyExpenseController(); $c->store();
+}
+// ADD THIS LINE
+elseif ($uri === '/expenses/daily/settle') {
+    $c = new DailyExpenseController(); $c->settle();
+}
 // PURCHASES
 elseif ($uri === '/expenses/purchases') {
     $c = new PurchaseController(); $c->index();

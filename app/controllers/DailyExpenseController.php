@@ -1,0 +1,86 @@
+<?php
+class DailyExpenseController {
+
+    public function index() {
+        $db = Database::getInstance();
+        
+        // Fetch Daily Expenses
+        $sql = "SELECT t.*, fa.name as source_account, a.name as category_name 
+                FROM account_transactions t
+                JOIN financial_accounts fa ON t.financial_account_id = fa.id
+                LEFT JOIN accounts a ON t.contra_account_id = a.id
+                WHERE fa.type = 'cash' AND t.type = 'credit'
+                ORDER BY t.date DESC, t.id DESC";
+        $expenses = $db->query($sql)->fetchAll();
+
+        $cashAccounts = $db->query("SELECT * FROM financial_accounts WHERE type='cash'")->fetchAll();
+        $categories = $db->query("SELECT * FROM accounts WHERE type IN ('expense', 'asset') ORDER BY name ASC")->fetchAll();
+
+        $pageTitle = "Daily Expenses";
+        $childView = ROOT_PATH . '/app/views/expenses/daily/index.php';
+        require_once ROOT_PATH . '/app/views/layouts/main.php';
+    }
+
+    public function store() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $db = Database::getInstance();
+            
+            $accId = $_POST['financial_account_id'];
+            $date = $_POST['date'];
+            $desc = $_POST['description'];
+            $catId = $_POST['category_id'];
+            
+            // LOGIC CHANGE:
+            // If "Change Later" is checked, we deduct the TENDERED amount (e.g. 1000) now.
+            // If not, we deduct the ACTUAL amount.
+            $isPending = isset($_POST['is_pending_change']) ? 1 : 0;
+            $tendered = floatval($_POST['tendered_amount']);
+            $actual = floatval($_POST['actual_amount']);
+
+            $amountToDeduct = $isPending ? $tendered : $actual;
+
+            $sql = "INSERT INTO account_transactions 
+                    (financial_account_id, date, type, amount, description, contra_account_id, is_pending_change, tendered_amount) 
+                    VALUES (?, ?, 'credit', ?, ?, ?, ?, ?)";
+            $stmt = $db->prepare($sql);
+            $stmt->execute([$accId, $date, $amountToDeduct, $desc, $catId, $isPending, $tendered]);
+
+            // Update Balance
+            $update = $db->prepare("UPDATE financial_accounts SET current_balance = current_balance - ? WHERE id = ?");
+            $update->execute([$amountToDeduct, $accId]);
+
+            header("Location: /expenses/daily");
+        }
+    }
+
+    // NEW: Settle the Change
+    public function settle() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $db = Database::getInstance();
+            
+            $id = $_POST['id'];
+            $actualExpense = floatval($_POST['final_actual_amount']);
+            
+            // 1. Get Original Transaction
+            $stmt = $db->prepare("SELECT * FROM account_transactions WHERE id = ?");
+            $stmt->execute([$id]);
+            $txn = $stmt->fetch();
+
+            if ($txn && $txn['is_pending_change']) {
+                $tendered = floatval($txn['tendered_amount']);
+                $changeReturned = $tendered - $actualExpense;
+
+                // 2. Update Transaction to Final Amount and remove Pending status
+                $updateTxn = $db->prepare("UPDATE account_transactions SET amount = ?, is_pending_change = 0 WHERE id = ?");
+                $updateTxn->execute([$actualExpense, $id]);
+
+                // 3. Restore the Change to the Cash Balance
+                // (We originally deducted 1000. Now we say it's only 300. So we add back 700).
+                $updateBal = $db->prepare("UPDATE financial_accounts SET current_balance = current_balance + ? WHERE id = ?");
+                $updateBal->execute([$changeReturned, $txn['financial_account_id']]);
+            }
+
+            header("Location: /expenses/daily");
+        }
+    }
+}
