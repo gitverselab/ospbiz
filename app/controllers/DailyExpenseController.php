@@ -4,17 +4,17 @@ class DailyExpenseController {
     public function index() {
         $db = Database::getInstance();
         
-        // 1. FILTERING (Keep existing logic)
+        // 1. FILTERING
         $search = $_GET['search'] ?? '';
         $fromDate = $_GET['from'] ?? '';
         $toDate = $_GET['to'] ?? '';
+        $categoryId = $_GET['category'] ?? ''; // NEW: Get Category ID
         
-        // NOTE: We removed "fa.type = 'cash'" from the filter so you can see Bank expenses too if you want.
-        // If you ONLY want to see Cash expenses in this list, change this line back to:
-        // $whereSql = "fa.type = 'cash' AND t.type = 'credit'";
+        // Base Query
         $whereSql = "t.type = 'credit'"; 
         $params = [];
 
+        // Apply Filters
         if ($search) {
             $whereSql .= " AND (t.description LIKE ? OR t.reference_no LIKE ?)";
             $params[] = "%$search%";
@@ -28,8 +28,12 @@ class DailyExpenseController {
             $whereSql .= " AND t.date <= ?";
             $params[] = $toDate;
         }
+        if ($categoryId) { // NEW: Apply Category Filter
+            $whereSql .= " AND t.contra_account_id = ?";
+            $params[] = $categoryId;
+        }
 
-        // 2. PAGINATION (Keep existing logic)
+        // 2. PAGINATION (Keep same logic)
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         $limit = 10;
         $offset = ($page - 1) * $limit;
@@ -56,11 +60,8 @@ class DailyExpenseController {
         $stmt->execute($params);
         $expenses = $stmt->fetchAll();
 
-        // 4. DROPDOWNS (UPDATED)
-        // Fetch ALL financial accounts (Bank & Cash) for the modal
+        // 4. DROPDOWNS
         $allFinancialAccounts = $db->query("SELECT * FROM financial_accounts ORDER BY type, name")->fetchAll();
-        
-        // Fetch Chart of Accounts (Expenses & Assets)
         $categories = $db->query("SELECT * FROM accounts WHERE type IN ('expense', 'asset', 'liability') ORDER BY code ASC")->fetchAll();
 
         $pageTitle = "Daily Expenses";

@@ -1,24 +1,41 @@
 <form method="GET" action="/expenses/daily" class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-    <div class="flex-1 w-full bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row gap-4 items-end">
-        <div class="w-full">
+    <div class="flex-1 w-full bg-white p-4 rounded-lg shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        
+        <div>
             <label class="text-xs font-bold text-gray-500 uppercase">Search</label>
-            <input type="text" name="search" value="<?php echo htmlspecialchars($_GET['search'] ?? ''); ?>" placeholder="Description or Ref..." class="w-full border p-2 rounded text-sm">
+            <input type="text" name="search" value="<?php echo htmlspecialchars($_GET['search'] ?? ''); ?>" placeholder="Description..." class="w-full border p-2 rounded text-sm">
         </div>
-        <div class="w-full md:w-48">
-            <label class="text-xs font-bold text-gray-500 uppercase">From</label>
-            <input type="date" name="from" value="<?php echo htmlspecialchars($_GET['from'] ?? ''); ?>" class="w-full border p-2 rounded text-sm">
+
+        <div>
+            <label class="text-xs font-bold text-gray-500 uppercase">Category</label>
+            <select name="category" class="w-full border p-2 rounded text-sm bg-white">
+                <option value="">All Categories</option>
+                <?php foreach($categories as $cat): ?>
+                    <option value="<?php echo $cat['id']; ?>" <?php echo (isset($_GET['category']) && $_GET['category'] == $cat['id']) ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($cat['name']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
         </div>
-        <div class="w-full md:w-48">
-            <label class="text-xs font-bold text-gray-500 uppercase">To</label>
-            <input type="date" name="to" value="<?php echo htmlspecialchars($_GET['to'] ?? ''); ?>" class="w-full border p-2 rounded text-sm">
-        </div>
+
         <div class="flex gap-2">
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700">Filter</button>
-            <a href="/expenses/daily" class="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-medium hover:bg-gray-300 flex items-center">Reset</a>
+            <div class="w-1/2">
+                <label class="text-xs font-bold text-gray-500 uppercase">From</label>
+                <input type="date" name="from" value="<?php echo htmlspecialchars($_GET['from'] ?? ''); ?>" class="w-full border p-2 rounded text-sm">
+            </div>
+            <div class="w-1/2">
+                <label class="text-xs font-bold text-gray-500 uppercase">To</label>
+                <input type="date" name="to" value="<?php echo htmlspecialchars($_GET['to'] ?? ''); ?>" class="w-full border p-2 rounded text-sm">
+            </div>
+        </div>
+
+        <div class="flex gap-2">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700 w-full">Filter</button>
+            <a href="/expenses/daily" class="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-medium hover:bg-gray-300 flex items-center justify-center w-full">Reset</a>
         </div>
     </div>
 
-    <div class="flex gap-2 shrink-0">
+    <div class="flex gap-2 shrink-0 self-start md:self-center">
         <button type="button" onclick="openModal()" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 text-sm font-bold">
             <i class="fa-solid fa-plus mr-2"></i> Add New Expense
         </button>
