@@ -62,10 +62,14 @@ elseif ($uri === '/audit/logs') {
     $controller = new AuditController();
     $controller->index();
 }
+// CATCH ALL: If the route starts with /bank, /expenses, /revenue, etc.
+elseif (preg_match('#^/(bank|expenses|revenue|settings|admin)#', $uri)) {
+    // Show the "Under Construction" view using the Main Layout
+    $pageTitle = "Work In Progress";
+    // We don't set $childView, so the main.php fallback will trigger
+    require_once ROOT_PATH . '/app/views/layouts/main.php';
+}
 else {
     header("HTTP/1.0 404 Not Found");
-    echo "<div style='font-family:sans-serif; text-align:center; margin-top:50px;'>";
     echo "<h1>404 Not Found</h1>";
-    echo "<p>The page <strong>" . htmlspecialchars($uri) . "</strong> does not exist.</p>";
-    echo "</div>";
 }
