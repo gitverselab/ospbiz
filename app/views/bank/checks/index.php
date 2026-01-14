@@ -7,10 +7,12 @@
 
 <form method="GET" action="/bank/checks" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
     <div class="flex flex-col md:flex-row gap-4 items-end">
+        
         <div class="flex-1">
             <label class="text-xs font-bold text-gray-500 uppercase">Search</label>
             <input type="text" name="search" value="<?= htmlspecialchars($filters['search']) ?>" placeholder="Check # or Payee..." class="w-full border p-2 rounded text-sm">
         </div>
+        
         <div class="w-full md:w-48">
             <label class="text-xs font-bold text-gray-500 uppercase">Bank Account</label>
             <select name="bank_id" class="w-full border p-2 rounded text-sm bg-white">
@@ -20,6 +22,7 @@
                 <?php endforeach; ?>
             </select>
         </div>
+
         <div class="w-full md:w-32">
             <label class="text-xs font-bold text-gray-500 uppercase">Status</label>
             <select name="status" class="w-full border p-2 rounded text-sm bg-white">
@@ -29,6 +32,26 @@
                 <option value="void" <?= ($filters['status'] == 'void') ? 'selected' : '' ?>>Void</option>
             </select>
         </div>
+
+        <div class="w-full md:w-32">
+            <label class="text-xs font-bold text-gray-500 uppercase">From</label>
+            <input type="date" name="from" value="<?= htmlspecialchars($filters['from']) ?>" class="w-full border p-2 rounded text-sm">
+        </div>
+        <div class="w-full md:w-32">
+            <label class="text-xs font-bold text-gray-500 uppercase">To</label>
+            <input type="date" name="to" value="<?= htmlspecialchars($filters['to']) ?>" class="w-full border p-2 rounded text-sm">
+        </div>
+
+        <div class="w-full md:w-24">
+            <label class="text-xs font-bold text-gray-500 uppercase">Show</label>
+            <select name="limit" class="w-full border p-2 rounded text-sm bg-white">
+                <option value="10" <?= ($filters['limit'] == 10) ? 'selected' : '' ?>>10</option>
+                <option value="25" <?= ($filters['limit'] == 25) ? 'selected' : '' ?>>25</option>
+                <option value="50" <?= ($filters['limit'] == 50) ? 'selected' : '' ?>>50</option>
+                <option value="100" <?= ($filters['limit'] == 100) ? 'selected' : '' ?>>100</option>
+            </select>
+        </div>
+
         <div class="flex gap-2">
             <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">Filter</button>
             <a href="/bank/checks" class="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-300 flex items-center">Reset</a>
@@ -51,7 +74,7 @@
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
             <?php if(empty($checks)): ?>
-                <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500 italic">No checks found.</td></tr>
+                <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500 italic">No checks found matching your criteria.</td></tr>
             <?php else: ?>
                 <?php foreach ($checks as $c): ?>
                 <tr class="hover:bg-gray-50">
@@ -96,13 +119,26 @@
 </div>
 
 <div class="flex justify-between items-center mt-4">
-    <div class="text-sm text-gray-500">Page <?= $filters['page'] ?> of <?= $filters['total_pages'] ?></div>
+    <div class="text-sm text-gray-500">
+        Showing Page <?= $filters['page'] ?> of <?= $filters['total_pages'] ?> 
+        (Total <?= $filters['total_records'] ?> records)
+    </div>
+    
     <div class="flex gap-2">
         <?php 
             $params = $_GET; unset($params['page']); 
             $baseUrl = '?' . http_build_query($params) . '&page=';
         ?>
-        <?php if ($filters['page'] > 1): ?><a href="<?= $baseUrl . ($filters['page'] - 1) ?>" class="px-3 py-1 bg-white border rounded text-sm">Prev</a><?php endif; ?>
-        <?php if ($filters['page'] < $filters['total_pages']): ?><a href="<?= $baseUrl . ($filters['page'] + 1) ?>" class="px-3 py-1 bg-white border rounded text-sm">Next</a><?php endif; ?>
+        <?php if ($filters['page'] > 1): ?>
+            <a href="<?= $baseUrl . ($filters['page'] - 1) ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Previous</a>
+        <?php else: ?>
+            <span class="px-3 py-1 bg-gray-100 border rounded text-gray-400 text-sm cursor-not-allowed">Previous</span>
+        <?php endif; ?>
+
+        <?php if ($filters['page'] < $filters['total_pages']): ?>
+            <a href="<?= $baseUrl . ($filters['page'] + 1) ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Next</a>
+        <?php else: ?>
+            <span class="px-3 py-1 bg-gray-100 border rounded text-gray-400 text-sm cursor-not-allowed">Next</span>
+        <?php endif; ?>
     </div>
 </div>
