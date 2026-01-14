@@ -3,12 +3,75 @@ class PurchasePaymentController {
 
     public function index() {
         $db = Database::getInstance();
+        
+        // --- 1. GET PARAMETERS ---
+        $search = $_GET['search'] ?? '';
+        $fromDate = $_GET['from'] ?? '';
+        $toDate = $_GET['to'] ?? '';
+        $method = $_GET['method'] ?? ''; // Filter by Cash/Check/Transfer
+
+        // Pagination Settings
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+        $offset = ($page - 1) * $limit;
+
+        // --- 2. BUILD QUERY ---
+        $whereSql = "1=1"; 
+        $params = [];
+
+        // Apply Filters
+        if ($search) {
+            $whereSql .= " AND (pp.reference_no LIKE ? OR s.name LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+        if ($fromDate) {
+            $whereSql .= " AND pp.date >= ?";
+            $params[] = $fromDate;
+        }
+        if ($toDate) {
+            $whereSql .= " AND pp.date <= ?";
+            $params[] = $toDate;
+        }
+        if ($method) {
+            $whereSql .= " AND pp.payment_method = ?";
+            $params[] = $method;
+        }
+
+        // --- 3. COUNT TOTAL (For Pagination) ---
+        $countSql = "SELECT COUNT(*) as total 
+                     FROM purchase_payments pp
+                     LEFT JOIN suppliers s ON pp.supplier_id = s.id
+                     WHERE $whereSql";
+        $stmtCount = $db->prepare($countSql);
+        $stmtCount->execute($params);
+        $totalRecords = $stmtCount->fetch()['total'];
+        $totalPages = ceil($totalRecords / $limit);
+
+        // --- 4. FETCH DATA ---
         $sql = "SELECT pp.*, s.name as supplier_name, fa.name as account_name 
                 FROM purchase_payments pp
                 LEFT JOIN suppliers s ON pp.supplier_id = s.id
                 LEFT JOIN financial_accounts fa ON pp.financial_account_id = fa.id
-                ORDER BY pp.date DESC";
-        $payments = $db->query($sql)->fetchAll();
+                WHERE $whereSql
+                ORDER BY pp.date DESC, pp.id DESC
+                LIMIT $limit OFFSET $offset";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $payments = $stmt->fetchAll();
+
+        // Pass filters back to view
+        $filters = [
+            'search' => $search, 
+            'from' => $fromDate, 
+            'to' => $toDate, 
+            'method' => $method,
+            'limit' => $limit,
+            'page' => $page,
+            'total_pages' => $totalPages,
+            'total_records' => $totalRecords
+        ];
 
         $pageTitle = "Purchase Payments";
         $childView = ROOT_PATH . '/app/views/expenses/payments/index.php';
