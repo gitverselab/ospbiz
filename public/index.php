@@ -79,12 +79,36 @@ elseif ($uri === '/expenses/daily/settle') {
     $c = new DailyExpenseController(); $c->settle();
 }
 
-// --- EXPENSES: BILLS ---
+// --- BILLS & RECURRING ---
 elseif ($uri === '/expenses/bills') {
     $c = new BillController(); $c->index();
 }
 elseif ($uri === '/expenses/bills/create') {
     $c = new BillController(); $c->create();
+}
+elseif ($uri === '/expenses/bills/store') {
+    $c = new BillController(); $c->store();
+}
+// Recurring
+elseif ($uri === '/expenses/recurring') {
+    $c = new BillController(); $c->recurringIndex();
+}
+elseif ($uri === '/expenses/recurring/create') {
+    $c = new BillController(); $c->storeRecurring();
+}
+elseif ($uri === '/expenses/recurring/generate') {
+    $c = new BillController(); $c->generate();
+}
+
+// --- BILL PAYMENTS ---
+elseif ($uri === '/expenses/bill-payments') {
+    $c = new BillPaymentController(); $c->index();
+}
+elseif ($uri === '/expenses/bill-payments/create') {
+    $c = new BillPaymentController(); $c->create();
+}
+elseif ($uri === '/expenses/bill-payments/store') {
+    $c = new BillPaymentController(); $c->store();
 }
 
 // --- BANK & CASH ---
