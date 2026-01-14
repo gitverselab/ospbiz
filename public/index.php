@@ -44,12 +44,16 @@ if ($uri === '/' || $uri === '/index.php' || $uri === '/dashboard') {
     $c = new JournalController(); $c->index();
 } 
 
-// --- EXPENSES: PURCHASES (Specific Rules FIRST) ---
+// --- EXPENSES: PURCHASES ---
 elseif ($uri === '/expenses/purchases') {
     $c = new PurchaseController(); $c->index();
 }
 elseif ($uri === '/expenses/purchases/create') {
     $c = new PurchaseController(); $c->create();
+}
+// NEW ROUTE FOR SAVING:
+elseif ($uri === '/expenses/purchases/store') {
+    $c = new PurchaseController(); $c->store();
 }
 
 // --- EXPENSES: PAYMENTS ---

@@ -16,8 +16,7 @@ class PurchaseController {
 
     public function create() {
         $db = Database::getInstance();
-        $suppliers = $db->query("SELECT * FROM suppliers WHERE is_active=1")->fetchAll();
-        // Just fetching items for dropdown if needed
+        $suppliers = $db->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY name ASC")->fetchAll();
         $items = $db->query("SELECT * FROM items")->fetchAll(); 
 
         $pageTitle = "Create Purchase Order";
@@ -37,8 +36,11 @@ class PurchaseController {
                 
                 $lines = json_decode($_POST['lines_json'], true);
                 $total = array_sum(array_column($lines, 'amount'));
+                
+                // Handle optional delivery date
+                $deliveryDate = !empty($_POST['expected_delivery_date']) ? $_POST['expected_delivery_date'] : null;
 
-                $stmt->execute([1, $_POST['supplier_id'], $_POST['po_number'], $_POST['date'], $_POST['expected_delivery_date'], $total]);
+                $stmt->execute([1, $_POST['supplier_id'], $_POST['po_number'], $_POST['date'], $deliveryDate, $total]);
                 $poId = $db->lastInsertId();
 
                 // 2. Create PO Lines

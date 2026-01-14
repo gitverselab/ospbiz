@@ -1,9 +1,9 @@
-<form action="/expenses/purchases/create" method="POST" class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-sm border border-gray-200">
+<form action="/expenses/purchases/store" method="POST" class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-sm border border-gray-200">
     <div class="flex justify-between items-center mb-6 border-b pb-4">
         <h2 class="text-xl font-bold text-gray-800">New Purchase Order</h2>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Supplier</label>
             <select name="supplier_id" class="w-full border p-2 rounded bg-white" required>
@@ -18,8 +18,12 @@
             <input type="text" name="po_number" class="w-full border p-2 rounded" placeholder="e.g. PO-2023-001" required>
         </div>
         <div>
-            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">PO Date</label>
             <input type="date" name="date" value="<?php echo date('Y-m-d'); ?>" class="w-full border p-2 rounded">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Expected Delivery</label>
+            <input type="date" name="expected_delivery_date" class="w-full border p-2 rounded">
         </div>
     </div>
 
@@ -41,13 +45,15 @@
     <button type="button" onclick="addLine()" class="text-blue-600 text-sm font-bold hover:underline mb-6">
         <i class="fa-solid fa-plus-circle"></i> Add Item Line
     </button>
+    
+    <input type="hidden" name="lines_json" id="linesJson">
 
     <div class="flex justify-end items-center border-t pt-4">
         <div class="mr-6 text-right">
             <div class="text-xs text-gray-500 uppercase">Grand Total</div>
             <div class="text-2xl font-bold text-gray-800" id="grandTotalDisplay">₱0.00</div>
         </div>
-        <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded font-bold hover:bg-blue-700 shadow">
+        <button type="submit" onclick="prepareSubmit(event)" class="bg-blue-600 text-white px-6 py-3 rounded font-bold hover:bg-blue-700 shadow">
             Save Purchase Order
         </button>
     </div>
@@ -58,7 +64,7 @@ function addLine() {
     const tr = document.createElement('tr');
     tr.className = "border-b hover:bg-gray-50";
     tr.innerHTML = `
-        <td class="p-2"><input class="w-full border p-1 rounded text-sm" name="desc" placeholder="Enter item name..." required></td>
+        <td class="p-2"><input class="w-full border p-1 rounded text-sm desc" placeholder="Enter item name..." required></td>
         <td class="p-2"><input class="w-full border p-1 rounded text-sm text-right qty" type="number" step="0.01" value="1" oninput="calcRow(this)" required></td>
         <td class="p-2"><input class="w-full border p-1 rounded text-sm text-right price" type="number" step="0.01" value="0" oninput="calcRow(this)" required></td>
         <td class="p-2 text-right font-bold text-gray-700 row-total">0.00</td>
@@ -84,6 +90,20 @@ function calcTotal() {
         grandTotal += (qty * price);
     });
     document.getElementById('grandTotalDisplay').innerText = '₱' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2});
+}
+
+function prepareSubmit(e) {
+    // Collect all lines into JSON
+    const lines = [];
+    document.querySelectorAll('#poLines tr').forEach(row => {
+        lines.push({
+            description: row.querySelector('.desc').value,
+            quantity: row.querySelector('.qty').value,
+            unit_price: row.querySelector('.price').value,
+            amount: (parseFloat(row.querySelector('.qty').value) * parseFloat(row.querySelector('.price').value))
+        });
+    });
+    document.getElementById('linesJson').value = JSON.stringify(lines);
 }
 
 // Initialize with one empty line
