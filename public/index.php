@@ -1,23 +1,21 @@
 <?php
-// 1. Enable Error Reporting (Turn off in production)
+// 1. Error Reporting
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 session_start();
 
-// 2. Define Root Path (One level up from this file)
+// 2. Define Root Path
 define('ROOT_PATH', dirname(__DIR__));
 
-// 3. Autoloader (Magically loads classes when needed)
+// 3. Autoloader
 spl_autoload_register(function ($class) {
-    // Convert class name to file path
     $paths = [
         ROOT_PATH . '/app/core/' . $class . '.php',
         ROOT_PATH . '/app/controllers/' . $class . '.php',
         ROOT_PATH . '/app/models/' . $class . '.php'
     ];
-
     foreach ($paths as $file) {
         if (file_exists($file)) {
             require_once $file;
@@ -26,36 +24,30 @@ spl_autoload_register(function ($class) {
     }
 });
 
-// 4. Load Environment Variables
+// 4. Load Env
+require_once ROOT_PATH . '/app/core/Env.php';
 try {
-    if (class_exists('Env')) {
-        Env::load(ROOT_PATH . '/.env');
-    } else {
-        die("Core Env class not found. Check /app/core/Env.php");
-    }
-} catch (Exception $e) {
-    die("Env Error: " . $e->getMessage());
-}
+    Env::load(ROOT_PATH . '/.env');
+} catch (Exception $e) { /* Ignore if missing for now */ }
 
-// 5. Simple Router
+// 5. Router Logic
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// If app is in a subfolder, remove it from URI (Optional logic, but good for safety)
-// For now, we assume domain points to /public so URI is just / or /journal/create
-
-// ROUTING LOGIC
-if ($uri === '/' || $uri === '/index.php') {
-    echo "<h1>It Works!</h1><a href='/journal/create'>Create Journal</a>";
+// Simple Route Map
+if ($uri === '/' || $uri === '/index.php' || $uri === '/dashboard') {
+    $controller = new JournalController(); // reusing for dashboard for now
+    $controller->index();
 } 
 elseif ($uri === '/journal/create') {
     $controller = new JournalController();
     $controller->create();
-} 
+}
 elseif ($uri === '/journal/approve') {
     $controller = new JournalController();
     $controller->approve();
-} 
+}
 else {
     header("HTTP/1.0 404 Not Found");
-    echo "404 Not Found - URI: " . htmlspecialchars($uri);
+    echo "<h1 style='font-family:sans-serif; text-align:center; margin-top:50px;'>404 Not Found</h1>";
+    echo "<p style='text-align:center;'>The page $uri does not exist.</p>";
 }

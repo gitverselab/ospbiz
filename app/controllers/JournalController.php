@@ -1,44 +1,37 @@
 <?php
-require_once '../app/models/JournalModel.php';
-require_once '../app/core/WorkflowEngine.php';
+// Ensure we have access to models
+require_once ROOT_PATH . '/app/models/JournalModel.php';
 
 class JournalController {
+
+    public function index() {
+        // Show the Dashboard or List
+        $childView = ROOT_PATH . '/app/views/dashboard.php';
+        require_once ROOT_PATH . '/app/views/layouts/main.php';
+    }
+
     public function create() {
-        // Auth Check assumed here
-        $user = $_SESSION['user'];
-        
+        // 1. If POST request, process the form
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            // CSRF Check needed here
-            $data = [
-                'date' => $_POST['date'],
-                'ref' => $_POST['reference_no'],
-                'desc' => $_POST['description']
-            ];
-            $lines = json_decode($_POST['lines_json'], true); // Lines sent as JSON string
-            
-            $model = new JournalModel();
-            try {
-                $id = $model->create($data, $lines, $user);
-                header("Location: /journal/view?id=$id");
-            } catch (Exception $e) {
-                echo "Error: " . $e->getMessage();
-            }
-        } else {
-            // Load accounts for dropdown
-            $db = Database::getInstance();
-            $accounts = $db->query("SELECT * FROM accounts WHERE company_id = {$user['company_id']}")->fetchAll();
-            require '../app/views/journal/create.php';
+            // Logic to save data would go here
+            // For now, let's just show the form again with a success message placeholder
         }
+
+        // 2. Load Data for the View (Mock Accounts for now)
+        $accounts = [
+            ['id' => 1, 'code' => '1000', 'name' => 'Cash'],
+            ['id' => 2, 'code' => '1200', 'name' => 'Accounts Receivable'],
+            ['id' => 3, 'code' => '2000', 'name' => 'Accounts Payable'],
+            ['id' => 4, 'code' => '4000', 'name' => 'Sales Revenue'],
+            ['id' => 5, 'code' => '5000', 'name' => 'Rent Expense'],
+        ];
+
+        // 3. Render the View inside the Layout
+        $childView = ROOT_PATH . '/app/views/journal/create.php';
+        require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
 
     public function approve() {
-        $id = $_POST['id'];
-        $user = $_SESSION['user'];
-        try {
-            WorkflowEngine::transition('journal', $id, 'approve', $user['id'], $user['role']);
-            header("Location: /journal/view?id=$id");
-        } catch (Exception $e) {
-            die($e->getMessage());
-        }
+        echo "Approval Logic Placeholder";
     }
 }
