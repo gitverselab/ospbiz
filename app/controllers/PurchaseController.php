@@ -16,13 +16,14 @@ class PurchaseController {
 
     public function create() {
         $db = Database::getInstance();
-        $suppliers = $db->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY name ASC")->fetchAll();
-        
+        $suppliers = $db->query("SELECT * FROM suppliers WHERE is_active=1")->fetchAll();
+        // Just fetching items for dropdown if needed
+        $items = $db->query("SELECT * FROM items")->fetchAll(); 
+
         $pageTitle = "Create Purchase Order";
         $childView = ROOT_PATH . '/app/views/expenses/purchases/create.php';
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
-}
 
     public function store() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
