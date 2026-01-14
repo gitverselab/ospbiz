@@ -4,15 +4,57 @@ class DailyExpenseController {
     public function index() {
         $db = Database::getInstance();
         
-        // Fetch Daily Expenses
+        // 1. FILTERING
+        $search = $_GET['search'] ?? '';
+        $fromDate = $_GET['from'] ?? '';
+        $toDate = $_GET['to'] ?? '';
+        
+        $whereSql = "fa.type = 'cash' AND t.type = 'credit'";
+        $params = [];
+
+        if ($search) {
+            $whereSql .= " AND (t.description LIKE ? OR t.reference_no LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+        if ($fromDate) {
+            $whereSql .= " AND t.date >= ?";
+            $params[] = $fromDate;
+        }
+        if ($toDate) {
+            $whereSql .= " AND t.date <= ?";
+            $params[] = $toDate;
+        }
+
+        // 2. PAGINATION
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = 10;
+        $offset = ($page - 1) * $limit;
+
+        // Count Total
+        $countSql = "SELECT COUNT(*) as total 
+                     FROM account_transactions t
+                     JOIN financial_accounts fa ON t.financial_account_id = fa.id
+                     WHERE $whereSql";
+        $stmtCount = $db->prepare($countSql);
+        $stmtCount->execute($params);
+        $totalRecords = $stmtCount->fetch()['total'];
+        $totalPages = ceil($totalRecords / $limit);
+
+        // 3. FETCH DATA
         $sql = "SELECT t.*, fa.name as source_account, a.name as category_name 
                 FROM account_transactions t
                 JOIN financial_accounts fa ON t.financial_account_id = fa.id
                 LEFT JOIN accounts a ON t.contra_account_id = a.id
-                WHERE fa.type = 'cash' AND t.type = 'credit'
-                ORDER BY t.date DESC, t.id DESC";
-        $expenses = $db->query($sql)->fetchAll();
+                WHERE $whereSql
+                ORDER BY t.date DESC, t.id DESC
+                LIMIT $limit OFFSET $offset";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $expenses = $stmt->fetchAll();
 
+        // 4. DROPDOWNS
         $cashAccounts = $db->query("SELECT * FROM financial_accounts WHERE type='cash'")->fetchAll();
         $categories = $db->query("SELECT * FROM accounts WHERE type IN ('expense', 'asset') ORDER BY name ASC")->fetchAll();
 

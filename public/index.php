@@ -30,17 +30,10 @@ try {
     if (file_exists(ROOT_PATH . '/.env')) {
         Env::load(ROOT_PATH . '/.env');
     }
-} catch (Exception $e) { /* Ignore if missing */ }
+} catch (Exception $e) { /* Ignore */ }
 
-// ==========================================
-// 5. ROUTER SETUP (THIS WAS MISSING)
-// ==========================================
-
-// Get the URL path (e.g., "/journal/create")
+// 5. Router Setup
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-
-// Optional: Handle sub-folder installation if not on root domain
-// $uri = str_replace('/ospbiz/public', '', $uri); 
 
 // ==========================================
 // 6. ROUTING LOGIC
@@ -51,14 +44,15 @@ if ($uri === '/' || $uri === '/index.php' || $uri === '/dashboard') {
     $c = new JournalController(); $c->index();
 } 
 
-// --- EXPENSES: PURCHASES (Fixing the Under Construction Issue) ---
-// These MUST be placed above the catch-all
+// --- EXPENSES: PURCHASES (Specific Rules FIRST) ---
 elseif ($uri === '/expenses/purchases') {
     $c = new PurchaseController(); $c->index();
 }
 elseif ($uri === '/expenses/purchases/create') {
     $c = new PurchaseController(); $c->create();
 }
+
+// --- EXPENSES: PAYMENTS ---
 elseif ($uri === '/expenses/payments') {
     $c = new PurchasePaymentController(); $c->index();
 }
@@ -85,23 +79,25 @@ elseif ($uri === '/expenses/bills/create') {
     $c = new BillController(); $c->create();
 }
 
-// --- JOURNAL ENTRIES ---
-elseif ($uri === '/journal/create') {
-    $c = new JournalController(); $c->create();
+// --- BANK & CASH ---
+elseif (strpos($uri, '/bank/passbooks') === 0) {
+    $c = new BankController();
+    if ($uri === '/bank/passbooks') $c->index();
+    elseif ($uri === '/bank/passbooks/create') $c->store();
+    elseif ($uri === '/bank/passbooks/view') $c->show();
+    elseif ($uri === '/bank/passbooks/transaction') $c->storeTransaction();
 }
-elseif ($uri === '/journal/list') {
-    $c = new JournalController(); $c->list();
-}
-elseif ($uri === '/journal/approve') {
-    $c = new JournalController(); $c->approve();
+elseif (strpos($uri, '/bank/cash-on-hand') === 0) {
+    $c = new CashController();
+    if ($uri === '/bank/cash-on-hand') $c->index();
+    elseif ($uri === '/bank/cash-on-hand/create') $c->store();
+    elseif ($uri === '/bank/cash-on-hand/view') $c->show();
+    elseif ($uri === '/bank/cash-on-hand/transaction') $c->storeTransaction();
+    elseif ($uri === '/bank/cash-on-hand/transaction/update') $c->updateTransaction();
+    elseif ($uri === '/bank/cash-on-hand/transaction/delete') $c->deleteTransaction();
 }
 
-// --- AUDIT TRAIL ---
-elseif ($uri === '/audit/logs') {
-    $c = new AuditController(); $c->index();
-}
-
-// --- SETTINGS & MASTER DATA ---
+// --- SETTINGS ---
 elseif ($uri === '/settings/coa') {
     $c = new COAController(); $c->index();
 }
@@ -121,30 +117,19 @@ elseif ($uri === '/settings/customers/create') {
     $c = new ContactController(); $c->createCustomer();
 }
 
-// --- BANK & CASH ---
-elseif (strpos($uri, '/bank/passbooks') === 0) {
-    $c = new BankController();
-    if ($uri === '/bank/passbooks') $c->index();
-    elseif ($uri === '/bank/passbooks/create') $c->store();
-    elseif ($uri === '/bank/passbooks/view') $c->show();
-    elseif ($uri === '/bank/passbooks/transaction') $c->storeTransaction();
-}
-elseif (strpos($uri, '/bank/cash-on-hand') === 0) {
-    $c = new CashController();
-    if ($uri === '/bank/cash-on-hand') $c->index();
-    elseif ($uri === '/bank/cash-on-hand/create') $c->store();
-    elseif ($uri === '/bank/cash-on-hand/view') $c->show();
-    elseif ($uri === '/bank/cash-on-hand/transaction') $c->storeTransaction();
-    elseif ($uri === '/bank/cash-on-hand/transaction/update') $c->updateTransaction();
-    elseif ($uri === '/bank/cash-on-hand/transaction/delete') $c->deleteTransaction();
+// --- AUDIT ---
+elseif ($uri === '/audit/logs') {
+    $c = new AuditController(); $c->index();
 }
 
 // --- CATCH ALL (Under Construction) ---
-// This handles any other /expenses/ or /bank/ url NOT defined above
+// THIS MUST BE THE LAST 'ELSEIF' TO PREVENT BLOCKING OTHER PAGES
 elseif (preg_match('#^/(bank|expenses|revenue|settings|admin)#', $uri)) {
     $pageTitle = "Work In Progress";
     require_once ROOT_PATH . '/app/views/layouts/main.php';
 }
+
+// --- 404 ---
 else {
     header("HTTP/1.0 404 Not Found");
     echo "<h1>404 Not Found</h1>";
