@@ -30,24 +30,29 @@ try {
     Env::load(ROOT_PATH . '/.env');
 } catch (Exception $e) { /* Ignore if missing for now */ }
 
-// 5. Router Logic
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+// ... (Keep the top part of index.php same as before) ...
 
-// Simple Route Map
+// ROUTING LOGIC
 if ($uri === '/' || $uri === '/index.php' || $uri === '/dashboard') {
-    $controller = new JournalController(); // reusing for dashboard for now
+    $controller = new JournalController();
     $controller->index();
 } 
 elseif ($uri === '/journal/create') {
     $controller = new JournalController();
     $controller->create();
 }
-elseif ($uri === '/journal/approve') {
+// NEW: View Journals
+elseif ($uri === '/journal/list') {
     $controller = new JournalController();
-    $controller->approve();
+    $controller->list();
+}
+// NEW: Audit Trail
+elseif ($uri === '/audit/logs') {
+    // Autoloader will load AuditController.php automatically
+    $controller = new AuditController();
+    $controller->index();
 }
 else {
     header("HTTP/1.0 404 Not Found");
-    echo "<h1 style='font-family:sans-serif; text-align:center; margin-top:50px;'>404 Not Found</h1>";
-    echo "<p style='text-align:center;'>The page $uri does not exist.</p>";
+    echo "<h1 style='text-align:center;margin-top:50px'>404 Not Found</h1>";
 }
