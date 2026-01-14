@@ -63,6 +63,10 @@ elseif ($uri === '/expenses/payments') {
 elseif ($uri === '/expenses/payments/create') {
     $c = new PurchasePaymentController(); $c->create();
 }
+// NEW ROUTE:
+elseif ($uri === '/expenses/payments/store') {
+    $c = new PurchasePaymentController(); $c->store();
+}
 
 // --- EXPENSES: DAILY EXPENSES ---
 elseif ($uri === '/expenses/daily') {

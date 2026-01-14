@@ -15,18 +15,17 @@ class PurchasePaymentController {
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
 
-    // Step 1: Choose Supplier to see unpaid POs
     public function create() {
         $db = Database::getInstance();
-        $suppliers = $db->query("SELECT * FROM suppliers WHERE is_active=1")->fetchAll();
-        $accounts = $db->query("SELECT * FROM financial_accounts")->fetchAll(); // Banks/Cash
+        $suppliers = $db->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY name ASC")->fetchAll();
+        $accounts = $db->query("SELECT * FROM financial_accounts ORDER BY type DESC, name ASC")->fetchAll();
 
-        // If Supplier is selected, fetch their open POs
         $openPOs = [];
-        if (isset($_GET['supplier_id'])) {
+        if (isset($_GET['supplier_id']) && !empty($_GET['supplier_id'])) {
             $supId = $_GET['supplier_id'];
+            // Fetch POs that are NOT fully paid
             $sql = "SELECT * FROM purchase_orders 
-                    WHERE supplier_id = ? AND status IN ('open', 'partial')
+                    WHERE supplier_id = ? AND status != 'paid'
                     ORDER BY date ASC";
             $stmt = $db->prepare($sql);
             $stmt->execute([$supId]);
@@ -44,40 +43,45 @@ class PurchasePaymentController {
             try {
                 $db->beginTransaction();
 
-                // 1. Create Payment Header (The Binder)
+                $totalPaid = floatval($_POST['total_paid']);
+                $accId = $_POST['financial_account_id'];
+
+                // 1. Create Payment Header (The "Binder")
                 $sql = "INSERT INTO purchase_payments (company_id, supplier_id, financial_account_id, payment_method, reference_no, date, total_paid) VALUES (?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $db->prepare($sql);
                 $stmt->execute([
                     1, 
                     $_POST['supplier_id'], 
-                    $_POST['financial_account_id'], 
+                    $accId, 
                     $_POST['payment_method'], 
                     $_POST['reference_no'], 
                     $_POST['date'], 
-                    $_POST['total_paid']
+                    $totalPaid
                 ]);
                 $paymentId = $db->lastInsertId();
 
-                // 2. Reduce Bank/Cash Balance
+                // 2. Deduct Money from Bank/Cash
                 $db->prepare("UPDATE financial_accounts SET current_balance = current_balance - ? WHERE id = ?")
-                   ->execute([$_POST['total_paid'], $_POST['financial_account_id']]);
+                   ->execute([$totalPaid, $accId]);
 
-                // 3. Loop through allocated POs
+                // 3. Allocate Payment to Specific POs
                 $allocations = json_decode($_POST['allocations_json'], true);
                 
                 $allocSql = "INSERT INTO purchase_payment_allocations (purchase_payment_id, purchase_order_id, amount_applied) VALUES (?, ?, ?)";
                 $allocStmt = $db->prepare($allocSql);
                 
-                $updatePOSql = "UPDATE purchase_orders SET amount_paid = amount_paid + ?, status = CASE WHEN amount_paid >= total_amount THEN 'paid' WHEN amount_paid > 0 THEN 'partial' ELSE status END WHERE id = ?";
+                // SAFETY FIX: Explicitly calculate (amount_paid + ?) in the condition to ensure accuracy
+                $updatePOSql = "UPDATE purchase_orders SET amount_paid = amount_paid + ?, status = CASE WHEN (amount_paid + ?) >= total_amount THEN 'paid' ELSE 'partial' END WHERE id = ?";
                 $updatePOStmt = $db->prepare($updatePOSql);
 
                 foreach ($allocations as $alloc) {
-                    if ($alloc['amount'] > 0) {
+                    $amount = floatval($alloc['amount']);
+                    if ($amount > 0) {
                         // Link Payment to PO
-                        $allocStmt->execute([$paymentId, $alloc['po_id'], $alloc['amount']]);
+                        $allocStmt->execute([$paymentId, $alloc['po_id'], $amount]);
                         
-                        // Update PO Status
-                        $updatePOStmt->execute([$alloc['amount'], $alloc['po_id']]);
+                        // Update PO Status (Passing amount twice: once for math, once for check)
+                        $updatePOStmt->execute([$amount, $amount, $alloc['po_id']]);
                     }
                 }
 
