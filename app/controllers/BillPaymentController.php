@@ -3,19 +3,64 @@ class BillPaymentController {
 
     public function index() {
         $db = Database::getInstance();
-        $search = $_GET['search'] ?? '';
         
-        $where = "1=1"; $params = [];
-        if($search) { $where .= " AND (reference_no LIKE ? OR s.name LIKE ?)"; $params[]="%$search%"; $params[]="%$search%"; }
+        // 1. GET PARAMETERS
+        $search = $_GET['search'] ?? '';
+        $fromDate = $_GET['from'] ?? '';
+        $toDate = $_GET['to'] ?? '';
+        $method = $_GET['method'] ?? '';
+        
+        // Pagination
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+        $offset = ($page - 1) * $limit;
 
+        // 2. BUILD QUERY
+        $whereSql = "1=1";
+        $params = [];
+        
+        if ($search) {
+            $whereSql .= " AND (bp.reference_no LIKE ? OR s.name LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+        if ($fromDate) {
+            $whereSql .= " AND bp.date >= ?";
+            $params[] = $fromDate;
+        }
+        if ($toDate) {
+            $whereSql .= " AND bp.date <= ?";
+            $params[] = $toDate;
+        }
+        if ($method) {
+            $whereSql .= " AND bp.payment_method = ?";
+            $params[] = $method;
+        }
+
+        // 3. PAGINATION COUNTS
+        $countSql = "SELECT COUNT(*) as total FROM bill_payments bp LEFT JOIN suppliers s ON bp.supplier_id = s.id WHERE $whereSql";
+        $stmtCount = $db->prepare($countSql);
+        $stmtCount->execute($params);
+        $totalRecords = $stmtCount->fetch()['total'];
+        $totalPages = ceil($totalRecords / $limit);
+
+        // 4. FETCH DATA
         $sql = "SELECT bp.*, s.name as supplier_name, fa.name as account_name 
                 FROM bill_payments bp 
                 LEFT JOIN suppliers s ON bp.supplier_id = s.id 
                 LEFT JOIN financial_accounts fa ON bp.financial_account_id = fa.id 
-                WHERE $where ORDER BY bp.date DESC";
+                WHERE $whereSql
+                ORDER BY bp.date DESC, bp.id DESC
+                LIMIT $limit OFFSET $offset";
+        
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $payments = $stmt->fetchAll();
+
+        $filters = [
+            'search' => $search, 'from' => $fromDate, 'to' => $toDate, 'method' => $method,
+            'limit' => $limit, 'page' => $page, 'total_pages' => $totalPages, 'total_records' => $totalRecords
+        ];
 
         $pageTitle = "Bill Payments";
         $childView = ROOT_PATH . '/app/views/expenses/bill_payments/index.php';

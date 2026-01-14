@@ -9,8 +9,37 @@
     <div class="flex flex-col md:flex-row gap-4 items-end">
         <div class="flex-1 w-full">
             <label class="text-xs font-bold text-gray-500 uppercase">Search</label>
-            <input type="text" name="search" value="<?php echo htmlspecialchars($_GET['search'] ?? ''); ?>" placeholder="Reference # or Supplier..." class="w-full border p-2 rounded text-sm">
+            <input type="text" name="search" value="<?php echo htmlspecialchars($filters['search']); ?>" placeholder="Reference # or Supplier..." class="w-full border p-2 rounded text-sm">
         </div>
+        
+        <div class="w-full md:w-32">
+            <label class="text-xs font-bold text-gray-500 uppercase">From</label>
+            <input type="date" name="from" value="<?php echo htmlspecialchars($filters['from']); ?>" class="w-full border p-2 rounded text-sm">
+        </div>
+        <div class="w-full md:w-32">
+            <label class="text-xs font-bold text-gray-500 uppercase">To</label>
+            <input type="date" name="to" value="<?php echo htmlspecialchars($filters['to']); ?>" class="w-full border p-2 rounded text-sm">
+        </div>
+
+        <div class="w-full md:w-32">
+            <label class="text-xs font-bold text-gray-500 uppercase">Method</label>
+            <select name="method" class="w-full border p-2 rounded text-sm bg-white">
+                <option value="">All</option>
+                <option value="check" <?php echo ($filters['method'] == 'check') ? 'selected' : ''; ?>>Check</option>
+                <option value="transfer" <?php echo ($filters['method'] == 'transfer') ? 'selected' : ''; ?>>Transfer</option>
+                <option value="cash" <?php echo ($filters['method'] == 'cash') ? 'selected' : ''; ?>>Cash</option>
+            </select>
+        </div>
+
+        <div class="w-full md:w-24">
+            <label class="text-xs font-bold text-gray-500 uppercase">Show</label>
+            <select name="limit" class="w-full border p-2 rounded text-sm bg-white">
+                <option value="10" <?php echo ($filters['limit'] == 10) ? 'selected' : ''; ?>>10</option>
+                <option value="25" <?php echo ($filters['limit'] == 25) ? 'selected' : ''; ?>>25</option>
+                <option value="50" <?php echo ($filters['limit'] == 50) ? 'selected' : ''; ?>>50</option>
+            </select>
+        </div>
+
         <div class="flex gap-2">
             <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700">Filter</button>
             <a href="/expenses/bill-payments" class="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-medium hover:bg-gray-300 flex items-center">Reset</a>
@@ -48,4 +77,24 @@
             <?php endif; ?>
         </tbody>
     </table>
+</div>
+
+<div class="flex justify-between items-center mt-4">
+    <div class="text-sm text-gray-500">
+        Showing Page <?php echo $filters['page']; ?> of <?php echo $filters['total_pages']; ?> 
+        (Total <?php echo $filters['total_records']; ?> records)
+    </div>
+    
+    <div class="flex gap-2">
+        <?php 
+            $params = $_GET; unset($params['page']); 
+            $baseUrl = '?' . http_build_query($params) . '&page=';
+        ?>
+        <?php if ($filters['page'] > 1): ?>
+            <a href="<?php echo $baseUrl . ($filters['page'] - 1); ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Previous</a>
+        <?php endif; ?>
+        <?php if ($filters['page'] < $filters['total_pages']): ?>
+            <a href="<?php echo $baseUrl . ($filters['page'] + 1); ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Next</a>
+        <?php endif; ?>
+    </div>
 </div>

@@ -1,38 +1,76 @@
 <?php
 class BillController {
 
-    // --- STANDARD BILLS LIST ---
     public function index() {
         $db = Database::getInstance();
+        
+        // --- 1. GET PARAMETERS ---
         $search = $_GET['search'] ?? '';
+        $fromDate = $_GET['from'] ?? '';
+        $toDate = $_GET['to'] ?? '';
+        $status = $_GET['status'] ?? ''; // Added Status Filter
+        
+        // Pagination Settings
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
         $offset = ($page - 1) * $limit;
 
-        $where = "1=1";
+        // --- 2. BUILD QUERY ---
+        $whereSql = "1=1"; 
         $params = [];
+
+        // Apply Filters
         if ($search) {
-            $where .= " AND (b.bill_number LIKE ? OR s.name LIKE ?)";
-            $params[] = "%$search%"; $params[] = "%$search%";
+            $whereSql .= " AND (b.bill_number LIKE ? OR s.name LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+        if ($fromDate) {
+            $whereSql .= " AND b.date >= ?";
+            $params[] = $fromDate;
+        }
+        if ($toDate) {
+            $whereSql .= " AND b.date <= ?";
+            $params[] = $toDate;
+        }
+        if ($status) {
+            $whereSql .= " AND b.status = ?";
+            $params[] = $status;
         }
 
-        // Count
-        $stmt = $db->prepare("SELECT COUNT(*) as total FROM bills b LEFT JOIN suppliers s ON b.supplier_id = s.id WHERE $where");
-        $stmt->execute($params);
-        $totalRecords = $stmt->fetch()['total'];
+        // --- 3. COUNT TOTAL (For Pagination) ---
+        $countSql = "SELECT COUNT(*) as total 
+                     FROM bills b
+                     LEFT JOIN suppliers s ON b.supplier_id = s.id
+                     WHERE $whereSql";
+        $stmtCount = $db->prepare($countSql);
+        $stmtCount->execute($params);
+        $totalRecords = $stmtCount->fetch()['total'];
         $totalPages = ceil($totalRecords / $limit);
 
-        // Fetch
+        // --- 4. FETCH DATA ---
         $sql = "SELECT b.*, s.name as supplier_name, (b.total_amount - b.amount_paid) as balance 
-                FROM bills b 
-                LEFT JOIN suppliers s ON b.supplier_id = s.id 
-                WHERE $where ORDER BY b.date DESC LIMIT $limit OFFSET $offset";
+                FROM bills b
+                LEFT JOIN suppliers s ON b.supplier_id = s.id
+                WHERE $whereSql
+                ORDER BY b.date DESC, b.id DESC
+                LIMIT $limit OFFSET $offset";
+        
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $bills = $stmt->fetchAll();
 
-        // Pass Filters
-        $filters = ['search'=>$search, 'page'=>$page, 'limit'=>$limit, 'total_pages'=>$totalPages, 'total_records'=>$totalRecords];
+        // Pass filters back to view
+        $filters = [
+            'search' => $search, 
+            'from' => $fromDate, 
+            'to' => $toDate, 
+            'status' => $status,
+            'limit' => $limit,
+            'page' => $page,
+            'total_pages' => $totalPages,
+            'total_records' => $totalRecords
+        ];
 
         $pageTitle = "Bills (Accounts Payable)";
         $childView = ROOT_PATH . '/app/views/expenses/bills/index.php';
@@ -74,16 +112,54 @@ class BillController {
     // --- RECURRING BILLS LIST ---
     public function recurringIndex() {
         $db = Database::getInstance();
+        
+        // 1. GET PARAMETERS
+        $search = $_GET['search'] ?? '';
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+        $offset = ($page - 1) * $limit;
+
+        // 2. BUILD QUERY
+        $whereSql = "1=1";
+        $params = [];
+        
+        if ($search) {
+            $whereSql .= " AND (r.profile_name LIKE ? OR s.name LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+
+        // 3. PAGINATION COUNTS
+        $countSql = "SELECT COUNT(*) as total FROM recurring_bills r LEFT JOIN suppliers s ON r.supplier_id = s.id WHERE $whereSql";
+        $stmtCount = $db->prepare($countSql);
+        $stmtCount->execute($params);
+        $totalRecords = $stmtCount->fetch()['total'];
+        $totalPages = ceil($totalRecords / $limit);
+
+        // 4. FETCH DATA
         $sql = "SELECT r.*, s.name as supplier_name, a.name as expense_account 
                 FROM recurring_bills r 
                 LEFT JOIN suppliers s ON r.supplier_id = s.id 
                 LEFT JOIN accounts a ON r.expense_account_id = a.id
-                ORDER BY r.next_due_date ASC";
-        $recurrings = $db->query($sql)->fetchAll();
+                WHERE $whereSql
+                ORDER BY r.next_due_date ASC
+                LIMIT $limit OFFSET $offset";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $recurrings = $stmt->fetchAll();
 
-        // Needed for the "Create Modal" on the same page
+        // 5. DROPDOWNS (For the Create Modal)
         $suppliers = $db->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY name")->fetchAll();
         $accounts = $db->query("SELECT * FROM accounts WHERE type IN ('expense','asset') ORDER BY code")->fetchAll();
+
+        $filters = [
+            'search' => $search,
+            'limit' => $limit,
+            'page' => $page,
+            'total_pages' => $totalPages,
+            'total_records' => $totalRecords
+        ];
 
         $pageTitle = "Recurring Bills";
         $childView = ROOT_PATH . '/app/views/expenses/bills/recurring.php';
