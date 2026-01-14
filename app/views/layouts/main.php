@@ -56,6 +56,10 @@
 
             <div class="nav-header">Expenses</div>
             
+            <a href="/bank/cash-on-hand" class="nav-link <?php echo (strpos($uri, '/bank/cash-on-hand') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-coins"></i> Petty Cash
+            </a>
+
             <a href="/expenses/daily" class="nav-link <?php echo (strpos($uri, '/expenses/daily') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-wallet"></i> Daily Expenses
             </a>
@@ -68,15 +72,19 @@
                 <i class="fa-solid fa-money-bill-transfer"></i> Purchase Payments
             </a>
 
-            <a href="/expenses/bills" class="nav-link <?php echo (strpos($uri, '/expenses/bills') === 0) ? 'active' : ''; ?>">
+            <a href="/expenses/bills" class="nav-link <?php echo ($uri === '/expenses/bills' || $uri === '/expenses/bills/create') ? 'active' : ''; ?>">
                 <i class="fa-solid fa-file-invoice"></i> Bills
             </a>
 
-            <a href="/expenses/recurring" class="nav-link">
+            <a href="/expenses/recurring" class="nav-link <?php echo (strpos($uri, '/expenses/recurring') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-arrows-rotate"></i> Recurring Bills
             </a>
 
-            <a href="/expenses/loans" class="nav-link">
+            <a href="/expenses/bill-payments" class="nav-link <?php echo (strpos($uri, '/expenses/bill-payments') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-money-check-dollar"></i> Bill Payments
+            </a>
+
+            <a href="/expenses/loans" class="nav-link <?php echo (strpos($uri, '/expenses/loans') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-building-columns"></i> Credits/Loans
             </a>
 
