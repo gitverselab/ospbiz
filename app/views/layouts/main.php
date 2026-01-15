@@ -241,6 +241,40 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
                 activeLink.scrollIntoView({ block: 'center', behavior: 'smooth' });
             }
         });
+
+        document.addEventListener('DOMContentLoaded', function() {
+        // 1. Find all forms on the page
+            const forms = document.querySelectorAll('form');
+
+            forms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    // 2. Find the submit button inside the form
+                    const btn = this.querySelector('button[type="submit"]');
+                    
+                    // 3. If found, disable it immediately
+                    if (btn) {
+                        // Prevent further clicks
+                        btn.disabled = true;
+                        
+                        // Visual feedback: Fade it out slightly and show a spinner or text
+                        btn.classList.add('opacity-75', 'cursor-not-allowed');
+                        
+                        // Store original text in case we need to revert (rare)
+                        const originalText = btn.innerText;
+                        
+                        // Change text to indicate processing
+                        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Processing...';
+                        
+                        // SAFETY: If the page doesn't reload after 10 seconds (e.g. server error), re-enable button
+                        setTimeout(() => {
+                            btn.disabled = false;
+                            btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                            btn.innerText = originalText;
+                        }, 10000);
+                    }
+                });
+            });
+        });
     </script>
 </body>
 </html>
