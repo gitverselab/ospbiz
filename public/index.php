@@ -251,7 +251,16 @@ elseif (preg_match('#^/(bank|expenses|revenue|settings|admin)#', $uri)) {
     $pageTitle = "Work In Progress";
     require_once ROOT_PATH . '/app/views/layouts/main.php';
 }
-
+// --- JOURNAL ENTRIES ---
+elseif ($uri === '/journal/list') {
+    $c = new JournalController(); $c->index();
+}
+elseif ($uri === '/journal/create') {
+    $c = new JournalController(); $c->create();
+}
+elseif ($uri === '/journal/store') {
+    $c = new JournalController(); $c->store();
+}
 // --- 404 ---
 else {
     header("HTTP/1.0 404 Not Found");
