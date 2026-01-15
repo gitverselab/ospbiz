@@ -1,63 +1,51 @@
-<form action="/settings/receipt/update" method="POST" class="max-w-4xl mx-auto bg-white p-8 rounded shadow border">
-    <h2 class="text-2xl font-bold mb-6 text-gray-800">Receipt / Invoice Compliance Settings</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
     
-    <div class="grid grid-cols-2 gap-6 mb-4">
-        <div>
-            <label class="block text-xs font-bold text-gray-500 uppercase">Registered Company Name</label>
-            <input type="text" name="company_name" value="<?= htmlspecialchars($settings['company_name'] ?? '') ?>" class="w-full border p-2 rounded">
-        </div>
-        <div>
-            <label class="block text-xs font-bold text-gray-500 uppercase">VAT Registered?</label>
-            <select name="is_vat_reg" class="w-full border p-2 rounded">
-                <option value="1" <?= ($settings['is_vat_reg']??1)==1?'selected':'' ?>>Yes (VAT Registered)</option>
-                <option value="0" <?= ($settings['is_vat_reg']??1)==0?'selected':'' ?>>No (Non-VAT)</option>
-            </select>
-        </div>
+    <div class="bg-white p-6 rounded shadow border">
+        <h2 class="text-xl font-bold mb-4 text-gray-800">Register New Booklet</h2>
+        <form action="/settings/receipt/store_booklet" method="POST">
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-500 uppercase">Booklet Number / Label</label>
+                <input type="text" name="booklet_number" placeholder="e.g. Bk-001" class="w-full border p-2 rounded">
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase">Series Start</label>
+                    <input type="number" name="series_start" placeholder="e.g. 1001" class="w-full border p-2 rounded" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase">Series End</label>
+                    <input type="number" name="series_end" placeholder="e.g. 1050" class="w-full border p-2 rounded" required>
+                </div>
+            </div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700">Register Booklet</button>
+        </form>
     </div>
 
-    <div class="mb-4">
-        <label class="block text-xs font-bold text-gray-500 uppercase">Registered Address</label>
-        <textarea name="company_address" class="w-full border p-2 rounded" rows="2"><?= htmlspecialchars($settings['company_address'] ?? '') ?></textarea>
+    <div class="bg-white p-6 rounded shadow border">
+        <h2 class="text-xl font-bold mb-4 text-gray-800">Active Booklets</h2>
+        <table class="w-full text-sm text-left">
+            <thead class="bg-gray-100 uppercase text-xs">
+                <tr>
+                    <th class="p-2">Label</th>
+                    <th class="p-2">Range</th>
+                    <th class="p-2">Next No.</th>
+                    <th class="p-2">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach($booklets as $b): ?>
+                <tr class="border-b">
+                    <td class="p-2 font-bold"><?= $b['booklet_number'] ?></td>
+                    <td class="p-2"><?= $b['series_start'] ?> - <?= $b['series_end'] ?></td>
+                    <td class="p-2 text-blue-600 font-mono font-bold"><?= $b['current_counter'] ?></td>
+                    <td class="p-2">
+                        <span class="px-2 py-1 rounded text-xs <?= ($b['status']=='active') ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600' ?>">
+                            <?= ucfirst($b['status']) ?>
+                        </span>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
     </div>
-
-    <div class="grid grid-cols-3 gap-6 mb-4">
-        <div>
-            <label class="block text-xs font-bold text-gray-500 uppercase">TIN</label>
-            <input type="text" name="company_tin" value="<?= htmlspecialchars($settings['company_tin'] ?? '') ?>" class="w-full border p-2 rounded">
-        </div>
-        <div>
-            <label class="block text-xs font-bold text-gray-500 uppercase">Business Style</label>
-            <input type="text" name="business_style" value="<?= htmlspecialchars($settings['business_style'] ?? '') ?>" class="w-full border p-2 rounded">
-        </div>
-        <div>
-            <label class="block text-xs font-bold text-gray-500 uppercase">BIR Permit / ATP No.</label>
-            <input type="text" name="bir_permit_no" value="<?= htmlspecialchars($settings['bir_permit_no'] ?? '') ?>" class="w-full border p-2 rounded">
-        </div>
-    </div>
-
-    <div class="bg-gray-50 p-4 rounded border mb-6">
-        <h3 class="font-bold text-sm mb-3">ATP Details</h3>
-        <div class="grid grid-cols-4 gap-4">
-            <div>
-                <label class="block text-xs text-gray-500">Date Issued</label>
-                <input type="date" name="date_issued" value="<?= $settings['date_issued'] ?? '' ?>" class="w-full border p-2 rounded">
-            </div>
-            <div>
-                <label class="block text-xs text-gray-500">Valid Until</label>
-                <input type="date" name="valid_until" value="<?= $settings['valid_until'] ?? '' ?>" class="w-full border p-2 rounded">
-            </div>
-            <div>
-                <label class="block text-xs text-gray-500">Serial Start</label>
-                <input type="text" name="serial_begin" value="<?= $settings['serial_begin'] ?? '' ?>" class="w-full border p-2 rounded">
-            </div>
-            <div>
-                <label class="block text-xs text-gray-500">Serial End</label>
-                <input type="text" name="serial_end" value="<?= $settings['serial_end'] ?? '' ?>" class="w-full border p-2 rounded">
-            </div>
-        </div>
-    </div>
-
-    <div class="text-right">
-        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-bold">Save Settings</button>
-    </div>
-</form>
+</div>
