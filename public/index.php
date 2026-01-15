@@ -222,8 +222,14 @@ elseif ($uri === '/revenue/remittance/store') {
 elseif ($uri === '/settings/coa') {
     $c = new COAController(); $c->index();
 }
-elseif ($uri === '/settings/coa/create') {
-    $c = new COAController(); $c->create();
+elseif ($uri === '/settings/coa/store') {
+    $c = new COAController(); $c->store();
+}
+elseif ($uri === '/settings/coa/update') {
+    $c = new COAController(); $c->update();
+}
+elseif ($uri === '/settings/coa/delete') {
+    $c = new COAController(); $c->delete();
 }
 elseif ($uri === '/settings/suppliers') {
     $c = new ContactController(); $c->suppliers();
