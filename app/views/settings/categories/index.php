@@ -41,7 +41,7 @@
                             <tr class="hover:bg-gray-50 border-b">
                                 <td class="p-3 font-medium text-gray-800">
                                     <?= htmlspecialchars($cat['name']) ?>
-                                    <div class="text-xs text-gray-400"><?= htmlspecialchars($cat['description']) ?></div>
+                                    <div class="text-xs text-gray-400"><?= htmlspecialchars($cat['description'] ?? '') ?></div>
                                 </td>
                                 <td class="p-3">
                                     <form action="/settings/categories/update" method="POST" class="flex items-center gap-2">

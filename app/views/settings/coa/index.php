@@ -25,7 +25,11 @@
                     <span class="bg-gray-100 text-gray-600 py-1 px-2 rounded text-xs uppercase font-bold"><?= $acc['type'] ?></span>
                 </td>
                 <td class="px-6 py-3 text-center">
-                    <?php if($acc['status'] === 'Active'): ?>
+                    <?php 
+                        // FIX: Use 'Active' as default if status is missing/null
+                        $status = $acc['status'] ?? 'Active'; 
+                    ?>
+                    <?php if($status === 'Active'): ?>
                         <span class="text-green-600 text-xs font-bold"><i class="fa-solid fa-check-circle"></i> Active</span>
                     <?php else: ?>
                         <span class="text-red-400 text-xs font-bold"><i class="fa-solid fa-ban"></i> Inactive</span>
