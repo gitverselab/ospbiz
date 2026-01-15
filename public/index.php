@@ -189,6 +189,9 @@ elseif ($uri === '/revenue/dr/template') {
 elseif ($uri === '/revenue/rts') {
     $c = new RtsController(); $c->index();
 }
+elseif ($uri === '/revenue/rts/create') {
+    $c = new RtsController(); $c->create();
+}
 elseif ($uri === '/revenue/rts/import') {
     $c = new RtsController(); $c->import();
 }
