@@ -5,11 +5,18 @@ class FundTransferController {
     public function index() {
         $db = Database::getInstance();
         
+        // 1. Get Filters
         $search = $_GET['search'] ?? '';
+        $fromDate = $_GET['from'] ?? '';
+        $toDate = $_GET['to'] ?? '';
+        $sourceId = $_GET['source_id'] ?? ''; // NEW
+        $destId = $_GET['dest_id'] ?? '';     // NEW
+        
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
         $offset = ($page - 1) * $limit;
 
+        // 2. Build Query
         $where = "1=1"; 
         $params = [];
         
@@ -17,14 +24,30 @@ class FundTransferController {
             $where .= " AND (ft.reference_no LIKE ? OR ft.description LIKE ?)";
             $params[] = "%$search%"; $params[] = "%$search%";
         }
+        if ($fromDate) {
+            $where .= " AND ft.date >= ?";
+            $params[] = $fromDate;
+        }
+        if ($toDate) {
+            $where .= " AND ft.date <= ?";
+            $params[] = $toDate;
+        }
+        if ($sourceId) {
+            $where .= " AND ft.from_account_id = ?";
+            $params[] = $sourceId;
+        }
+        if ($destId) {
+            $where .= " AND ft.to_account_id = ?";
+            $params[] = $destId;
+        }
 
-        // Count
+        // 3. Count
         $stmt = $db->prepare("SELECT COUNT(*) as total FROM fund_transfers ft WHERE $where");
         $stmt->execute($params);
         $totalRecords = $stmt->fetch()['total'];
         $totalPages = ceil($totalRecords / $limit);
 
-        // Fetch Data
+        // 4. Fetch Data
         $sql = "SELECT ft.*, 
                 f1.name as from_acc, f1.type as from_type,
                 f2.name as to_acc, f2.type as to_type
@@ -39,7 +62,15 @@ class FundTransferController {
         $stmt->execute($params);
         $transfers = $stmt->fetchAll();
 
-        $filters = ['search'=>$search, 'page'=>$page, 'limit'=>$limit, 'total_pages'=>$totalPages, 'total_records'=>$totalRecords];
+        // 5. Get Accounts for Dropdowns
+        $accounts = $db->query("SELECT * FROM financial_accounts ORDER BY type, name")->fetchAll();
+
+        $filters = [
+            'search' => $search, 'from' => $fromDate, 'to' => $toDate,
+            'source_id' => $sourceId, 'dest_id' => $destId,
+            'page' => $page, 'limit' => $limit, 
+            'total_pages' => $totalPages, 'total_records' => $totalRecords
+        ];
 
         $pageTitle = "Fund Transfers";
         $childView = ROOT_PATH . '/app/views/bank/transfers/index.php';

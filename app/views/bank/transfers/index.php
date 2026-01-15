@@ -6,21 +6,62 @@
 </div>
 
 <form method="GET" action="/bank/transfers" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-    <div class="flex flex-col md:flex-row gap-4 items-end">
-        <div class="flex-1 w-full">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        
+        <div class="col-span-1">
             <label class="text-xs font-bold text-gray-500 uppercase">Search</label>
             <input type="text" name="search" value="<?= htmlspecialchars($filters['search']) ?>" placeholder="Ref # or Description..." class="w-full border p-2 rounded text-sm">
         </div>
-        <div class="w-full md:w-24">
-            <label class="text-xs font-bold text-gray-500 uppercase">Show</label>
-            <select name="limit" class="w-full border p-2 rounded text-sm bg-white">
+
+        <div class="col-span-1">
+            <label class="text-xs font-bold text-gray-500 uppercase">From (Source)</label>
+            <select name="source_id" class="w-full border p-2 rounded text-sm bg-white">
+                <option value="">All Accounts</option>
+                <?php foreach($accounts as $acc): ?>
+                    <option value="<?= $acc['id'] ?>" <?= ($filters['source_id'] == $acc['id']) ? 'selected' : '' ?>>
+                        <?= $acc['name'] ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div class="col-span-1">
+            <label class="text-xs font-bold text-gray-500 uppercase">To (Destination)</label>
+            <select name="dest_id" class="w-full border p-2 rounded text-sm bg-white">
+                <option value="">All Accounts</option>
+                <?php foreach($accounts as $acc): ?>
+                    <option value="<?= $acc['id'] ?>" <?= ($filters['dest_id'] == $acc['id']) ? 'selected' : '' ?>>
+                        <?= $acc['name'] ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        
+        <div class="col-span-1">
+            <label class="text-xs font-bold text-gray-500 uppercase">Date From</label>
+            <input type="date" name="from" value="<?= htmlspecialchars($filters['from']) ?>" class="w-full border p-2 rounded text-sm">
+        </div>
+        
+        <div class="col-span-1 flex gap-2">
+            <div class="w-full">
+                <label class="text-xs font-bold text-gray-500 uppercase">Date To</label>
+                <input type="date" name="to" value="<?= htmlspecialchars($filters['to']) ?>" class="w-full border p-2 rounded text-sm">
+            </div>
+        </div>
+    </div>
+    
+    <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
+        <div class="w-32">
+            <label class="text-xs font-bold text-gray-500 uppercase mr-2">Show</label>
+            <select name="limit" class="border p-1 rounded text-sm bg-white" onchange="this.form.submit()">
                 <option value="10" <?= ($filters['limit'] == 10) ? 'selected' : '' ?>>10</option>
                 <option value="25" <?= ($filters['limit'] == 25) ? 'selected' : '' ?>>25</option>
+                <option value="50" <?= ($filters['limit'] == 50) ? 'selected' : '' ?>>50</option>
             </select>
         </div>
         <div class="flex gap-2">
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">Filter</button>
-            <a href="/bank/transfers" class="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-300 flex items-center">Reset</a>
+            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded text-sm font-medium hover:bg-blue-700">Filter</button>
+            <a href="/bank/transfers" class="bg-gray-200 text-gray-700 px-6 py-2 rounded text-sm font-medium hover:bg-gray-300 flex items-center">Reset</a>
         </div>
     </div>
 </form>
