@@ -96,8 +96,8 @@
             </a>
 
             <div class="nav-header">Revenue</div>
-            <a href="/revenue/delivery" class="nav-link"><i class="fa-solid fa-truck"></i> Delivery Receipts</a>
-            <a href="/revenue/rts" class="nav-link"><i class="fa-solid fa-rotate-left"></i> RTS Receipts</a>
+            <a href="/revenue/dr" class="nav-link"><i class="fa-solid fa-truck"></i> DR Management</a>
+            <a href="/revenue/rts" class="nav-link"><i class="fa-solid fa-rotate-left"></i> RTS Management</a>
             <a href="/revenue/imports" class="nav-link"><i class="fa-solid fa-ship"></i> Import Receipts</a>
             <a href="/revenue/sales" class="nav-link"><i class="fa-solid fa-cash-register"></i> Sales</a>
             <a href="/revenue/remittance" class="nav-link"><i class="fa-solid fa-hand-holding-dollar"></i> Remittance</a>

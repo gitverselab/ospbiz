@@ -64,6 +64,15 @@ elseif (strpos($uri, '/bank/passbooks') === 0) {
     elseif ($uri === '/bank/passbooks/view') $c->show();
     elseif ($uri === '/bank/passbooks/transaction') $c->storeTransaction();
 }
+elseif (strpos($uri, '/bank/cash-on-hand') === 0) {
+    $c = new CashController();
+    if ($uri === '/bank/cash-on-hand') $c->index();
+    elseif ($uri === '/bank/cash-on-hand/create') $c->store();
+    elseif ($uri === '/bank/cash-on-hand/view') $c->show();
+    elseif ($uri === '/bank/cash-on-hand/transaction') $c->storeTransaction();
+    elseif ($uri === '/bank/cash-on-hand/transaction/update') $c->updateTransaction();
+    elseif ($uri === '/bank/cash-on-hand/transaction/delete') $c->deleteTransaction();
+}
 // --- BANK: FUND TRANSFERS ---
 elseif ($uri === '/bank/transfers') {
     $c = new FundTransferController(); $c->index();
@@ -129,7 +138,6 @@ elseif ($uri === '/expenses/recurring/create') {
 elseif ($uri === '/expenses/recurring/generate') {
     $c = new BillController(); $c->generate();
 }
-
 // --- BILL PAYMENTS ---
 elseif ($uri === '/expenses/bill-payments') {
     $c = new BillPaymentController(); $c->index();
@@ -160,14 +168,29 @@ elseif ($uri === '/expenses/loan-payments/create') {
 elseif ($uri === '/expenses/loan-payments/store') {
     $c = new LoanPaymentController(); $c->store();
 }
-elseif (strpos($uri, '/bank/cash-on-hand') === 0) {
-    $c = new CashController();
-    if ($uri === '/bank/cash-on-hand') $c->index();
-    elseif ($uri === '/bank/cash-on-hand/create') $c->store();
-    elseif ($uri === '/bank/cash-on-hand/view') $c->show();
-    elseif ($uri === '/bank/cash-on-hand/transaction') $c->storeTransaction();
-    elseif ($uri === '/bank/cash-on-hand/transaction/update') $c->updateTransaction();
-    elseif ($uri === '/bank/cash-on-hand/transaction/delete') $c->deleteTransaction();
+// --- REVENUE: DR ---
+elseif ($uri === '/revenue/dr') {
+    $c = new DrController(); $c->index();
+}
+elseif ($uri === '/revenue/dr/import') {
+    $c = new DrController(); $c->import();
+}
+elseif ($uri === '/revenue/dr/export') {
+    $c = new DrController(); $c->export();
+}
+elseif ($uri === '/revenue/dr/template') {
+    $c = new DrController(); $c->template();
+}
+
+// --- REVENUE: RTS ---
+elseif ($uri === '/revenue/rts') {
+    $c = new RtsController(); $c->index();
+}
+elseif ($uri === '/revenue/rts/import') {
+    $c = new RtsController(); $c->import();
+}
+elseif ($uri === '/revenue/rts/template') {
+    $c = new RtsController(); $c->template();
 }
 // --- SETTINGS ---
 elseif ($uri === '/settings/coa') {
