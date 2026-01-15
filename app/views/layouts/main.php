@@ -1,9 +1,13 @@
+<?php
+// 1. FIX: Get the current URL so we can highlight the correct menu item
+$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OSP Accounting</title>
+    <title><?php echo isset($pageTitle) ? $pageTitle : 'OSP Accounting'; ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -23,7 +27,10 @@
         .nav-header { font-size: 0.7rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-top: 1.5rem; margin-bottom: 0.5rem; padding-left: 1.5rem; }
         .nav-link { display: flex; align-items: center; padding: 0.75rem 1.5rem; color: #cbd5e1; transition: all 0.2s; font-size: 0.9rem; }
         .nav-link:hover { background-color: var(--sidebar-hover); color: white; }
+        
+        /* Active Link Styling */
         .nav-link.active { background-color: #0f172a; border-right: 4px solid var(--active-link); color: white; }
+        
         .nav-link i { width: 20px; text-align: center; margin-right: 10px; }
     </style>
 </head>
@@ -45,25 +52,37 @@
 
         <nav class="flex-1 overflow-y-auto nav-scroll py-4">
             <div class="nav-header">Management</div>
-            <a href="/dashboard" class="nav-link active"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
+            <a href="/" class="nav-link <?php echo ($uri === '/' || $uri === '/index.php' || $uri === '/dashboard') ? 'active' : ''; ?>">
+                <i class="fa-solid fa-gauge-high"></i> Dashboard
+            </a>
             
             <div class="nav-header">Bank & Cash</div>
             <a href="/bank/checks" class="nav-link <?php echo (strpos($uri, '/bank/checks') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-money-check"></i> Checks
             </a>
-            <a href="/bank/passbooks" class="nav-link"><i class="fa-solid fa-book"></i> Passbooks</a>
-            <a href="/bank/cash-on-hand" class="nav-link"><i class="fa-solid fa-wallet"></i> Cash On Hand</a>
+            <a href="/bank/passbooks" class="nav-link <?php echo (strpos($uri, '/bank/passbooks') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-book"></i> Passbooks
+            </a>
+            <a href="/bank/cash-on-hand" class="nav-link <?php echo (strpos($uri, '/bank/cash-on-hand') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-wallet"></i> Petty Cash
+            </a>
             <a href="/bank/transfers" class="nav-link <?php echo (strpos($uri, '/bank/transfers') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-arrow-right-arrow-left"></i> Fund Transfers
             </a>
-            <a href="/bank/calendar" class="nav-link"><i class="fa-solid fa-calendar-days"></i> Calendar</a>
+            <a href="/bank/calendar" class="nav-link <?php echo (strpos($uri, '/bank/calendar') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-calendar-days"></i> Calendar
+            </a>
+
+            <div class="nav-header">Revenue</div>
+            <a href="/revenue/dr" class="nav-link <?php echo (strpos($uri, '/revenue/dr') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-truck"></i> DR Management
+            </a>
+            <a href="/revenue/rts" class="nav-link <?php echo (strpos($uri, '/revenue/rts') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-rotate-left"></i> RTS Management
+            </a>
 
             <div class="nav-header">Expenses</div>
             
-            <a href="/bank/cash-on-hand" class="nav-link <?php echo (strpos($uri, '/bank/cash-on-hand') === 0) ? 'active' : ''; ?>">
-                <i class="fa-solid fa-coins"></i> Petty Cash
-            </a>
-
             <a href="/expenses/daily" class="nav-link <?php echo (strpos($uri, '/expenses/daily') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-wallet"></i> Daily Expenses
             </a>
@@ -95,28 +114,16 @@
                 <i class="fa-solid fa-money-bill-wave"></i> Loan Payments
             </a>
 
-            <div class="nav-header">Revenue</div>
-            <a href="/revenue/dr" class="nav-link"><i class="fa-solid fa-truck"></i> DR Management</a>
-            <a href="/revenue/rts" class="nav-link"><i class="fa-solid fa-rotate-left"></i> RTS Management</a>
-            <a href="/revenue/imports" class="nav-link"><i class="fa-solid fa-ship"></i> Import Receipts</a>
-            <a href="/revenue/sales" class="nav-link"><i class="fa-solid fa-cash-register"></i> Sales</a>
-            <a href="/revenue/remittance" class="nav-link"><i class="fa-solid fa-hand-holding-dollar"></i> Remittance</a>
-
-            <div class="nav-header">Accounting</div>
-            <a href="/journal/create" class="nav-link"><i class="fa-solid fa-pen-fancy"></i> Journal Entry</a>
-            <a href="/journal/list" class="nav-link"><i class="fa-solid fa-list-check"></i> View Journals</a>
-            <a href="/reports" class="nav-link"><i class="fa-solid fa-chart-pie"></i> Reports</a>
-
             <div class="nav-header">Settings</div>
-            <a href="/settings/suppliers" class="nav-link"><i class="fa-solid fa-users"></i> Suppliers</a>
-            <a href="/settings/customers" class="nav-link"><i class="fa-solid fa-user-tag"></i> Customers</a>
-            <a href="/settings/items" class="nav-link"><i class="fa-solid fa-box"></i> Items</a>
-            <a href="/settings/coa" class="nav-link"><i class="fa-solid fa-sitemap"></i> Chart of Accounts</a>
-            
-            <div class="nav-header">App System</div>
-            <a href="/admin/users" class="nav-link"><i class="fa-solid fa-user-gear"></i> Manage Users</a>
-            <a href="/audit/logs" class="nav-link"><i class="fa-solid fa-shield-halved"></i> Audit Trail</a>
-            <a href="/admin/theme" class="nav-link"><i class="fa-solid fa-palette"></i> System Theme</a>
+            <a href="/settings/coa" class="nav-link <?php echo (strpos($uri, '/settings/coa') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-sitemap"></i> Chart of Accounts
+            </a>
+            <a href="/settings/suppliers" class="nav-link <?php echo (strpos($uri, '/settings/suppliers') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-users"></i> Suppliers
+            </a>
+            <a href="/settings/customers" class="nav-link <?php echo (strpos($uri, '/settings/customers') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-user-tag"></i> Customers
+            </a>
         </nav>
 
         <div class="p-4 bg-slate-950 border-t border-slate-800 shrink-0">
@@ -149,9 +156,9 @@
                     <div class="text-xs text-gray-500">Current Date</div>
                     <div class="text-sm font-bold text-gray-800"><?php echo date('F j, Y'); ?></div>
                 </div>
-                <button class="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600">
+                <div class="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 border border-gray-200">
                     <i class="fa-regular fa-bell"></i>
-                </button>
+                </div>
             </div>
         </header>
 
