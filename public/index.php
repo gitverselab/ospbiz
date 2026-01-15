@@ -172,6 +172,9 @@ elseif ($uri === '/expenses/loan-payments/store') {
 elseif ($uri === '/revenue/dr') {
     $c = new DrController(); $c->index();
 }
+elseif ($uri === '/revenue/dr/create') {
+    $c = new DrController(); $c->create();
+}
 elseif ($uri === '/revenue/dr/import') {
     $c = new DrController(); $c->import();
 }
