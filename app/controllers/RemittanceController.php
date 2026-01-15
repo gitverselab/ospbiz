@@ -1,0 +1,125 @@
+<?php
+class RemittanceController {
+
+    // --- LIST REMITTANCES ---
+    public function index() {
+        $db = Database::getInstance();
+        $search = $_GET['search'] ?? '';
+        $where = "1=1";
+        $params = [];
+
+        if($search) {
+            $where .= " AND (customer_name LIKE ? OR reference_no LIKE ?)";
+            $params[] = "%$search%"; $params[] = "%$search%";
+        }
+
+        $sql = "SELECT pr.*, fa.name as bank_name 
+                FROM payment_remittances pr
+                LEFT JOIN financial_accounts fa ON pr.financial_account_id = fa.id
+                WHERE $where ORDER BY date DESC";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $remittances = $stmt->fetchAll();
+
+        $pageTitle = "Payment Remittances";
+        $childView = ROOT_PATH . '/app/views/revenue/remittance/index.php';
+        require_once ROOT_PATH . '/app/views/layouts/main.php';
+    }
+
+    // --- CREATE FORM ---
+    public function create() {
+        $db = Database::getInstance();
+        
+        // 1. Get Customers with UNPAID Invoices
+        $customers = $db->query("SELECT DISTINCT customer_name FROM sales_invoices WHERE status = 'unpaid' ORDER BY customer_name")->fetchAll();
+        
+        // 2. Get Open Invoices for Selected Customer
+        $openInvoices = [];
+        if (isset($_GET['customer'])) {
+            $cust = $_GET['customer'];
+            $invSql = "SELECT * FROM sales_invoices WHERE customer_name = ? AND status = 'unpaid' ORDER BY date ASC";
+            $stmt = $db->prepare($invSql);
+            $stmt->execute([$cust]);
+            $openInvoices = $stmt->fetchAll();
+        }
+
+        // 3. Get Bank Accounts for Deposit
+        $banks = $db->query("SELECT * FROM financial_accounts WHERE type IN ('bank', 'cash') ORDER BY name")->fetchAll();
+
+        $pageTitle = "Record Payment Remittance";
+        $childView = ROOT_PATH . '/app/views/revenue/remittance/create.php';
+        require_once ROOT_PATH . '/app/views/layouts/main.php';
+    }
+
+    // --- STORE REMITTANCE ---
+    public function store() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $db = Database::getInstance();
+            try {
+                $db->beginTransaction();
+
+                $customer = $_POST['customer_name'];
+                $date = $_POST['date'];
+                $ref = $_POST['reference_no'];
+                $bankId = $_POST['financial_account_id'];
+                $selectedInvIds = $_POST['invoice_ids'] ?? [];
+
+                if (empty($selectedInvIds)) die("No invoices selected.");
+                if (empty($bankId)) die("Please select a deposit account.");
+
+                // 1. Calculate Totals from Selected Invoices
+                $placeholders = str_repeat('?,', count($selectedInvIds) - 1) . '?';
+                $sql = "SELECT * FROM sales_invoices WHERE id IN ($placeholders)";
+                $stmt = $db->prepare($sql);
+                $stmt->execute($selectedInvIds);
+                $invoices = $stmt->fetchAll();
+
+                $totalGross = 0;
+                $totalVatable = 0;
+
+                foreach ($invoices as $inv) {
+                    $totalGross += floatval($inv['total_amount_due']);
+                    $totalVatable += floatval($inv['vatable_sales']);
+                }
+
+                // 2. Calculate WHT (1% of Total Vatable) - Matches the remittance image
+                $totalWht = $totalVatable * 0.01;
+                
+                // 3. Calculate Net Received
+                $netReceived = $totalGross - $totalWht;
+
+                // 4. Insert Remittance Record
+                $insertRemit = $db->prepare("INSERT INTO payment_remittances (company_id, date, customer_name, reference_no, financial_account_id, total_gross_amount, total_wht_amount, net_amount_received) VALUES (1, ?, ?, ?, ?, ?, ?, ?)");
+                $insertRemit->execute([$date, $customer, $ref, $bankId, $totalGross, $totalWht, $netReceived]);
+                $remitId = $db->lastInsertId();
+
+                // 5. Link Invoices and Mark as Paid
+                $linkStmt = $db->prepare("INSERT INTO remittance_invoice_links (remittance_id, invoice_id, applied_amount) VALUES (?, ?, ?)");
+                $updateInv = $db->prepare("UPDATE sales_invoices SET status = 'paid' WHERE id = ?");
+
+                foreach ($invoices as $inv) {
+                    // Link the full invoice amount
+                    $linkStmt->execute([$remitId, $inv['id'], $inv['total_amount_due']]);
+                    // Mark as paid
+                    $updateInv->execute([$inv['id']]);
+                }
+
+                // 6. Update Bank Balance (Add Net Amount Received)
+                $db->prepare("UPDATE financial_accounts SET current_balance = current_balance + ? WHERE id = ?")
+                   ->execute([$netReceived, $bankId]);
+
+                // 7. Record Transaction Log
+                $desc = "Payment from $customer for " . count($invoices) . " invoices (Ref: $ref)";
+                $db->prepare("INSERT INTO account_transactions (financial_account_id, date, type, amount, description, reference_no) VALUES (?, ?, 'debit', ?, ?, ?)")
+                   ->execute([$bankId, $date, $netReceived, $desc, $ref]);
+
+                $db->commit();
+                header("Location: /revenue/remittance");
+
+            } catch (Exception $e) {
+                $db->rollBack();
+                die($e->getMessage());
+            }
+        }
+    }
+}

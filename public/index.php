@@ -208,6 +208,16 @@ elseif ($uri === '/revenue/sales/create') {
 elseif ($uri === '/revenue/sales/store') {
     $c = new SalesController(); $c->store();
 }
+// --- REVENUE: REMITTANCE ---
+elseif ($uri === '/revenue/remittance') {
+    $c = new RemittanceController(); $c->index();
+}
+elseif ($uri === '/revenue/remittance/create') {
+    $c = new RemittanceController(); $c->create();
+}
+elseif ($uri === '/revenue/remittance/store') {
+    $c = new RemittanceController(); $c->store();
+}
 // --- SETTINGS ---
 elseif ($uri === '/settings/coa') {
     $c = new COAController(); $c->index();
