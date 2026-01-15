@@ -88,14 +88,16 @@ class SalesController {
 
                 $invNum = $_POST['invoice_number'];
                 $selectedDrIds = $_POST['dr_ids'] ?? [];
+                
+                // Get the WHT amount calculated by JS (or manually edited)
+                $whtAmount = floatval($_POST['wht_amount'] ?? 0);
 
                 if (empty($selectedDrIds)) {
                     throw new Exception("Please select at least one Delivery Receipt (DR).");
                 }
 
-                // A. Validate Booklet (Optional - helps prevent typos)
+                // A. Validate Booklet
                 $booklet = $db->query("SELECT * FROM invoice_booklets WHERE '$invNum' BETWEEN series_start AND series_end AND status='active'")->fetch();
-                // Note: We don't stop execution if booklet missing, just in case you are encoding old data.
 
                 // B. Calculate Totals from DR Lines
                 $placeholders = str_repeat('?,', count($selectedDrIds) - 1) . '?';
@@ -109,42 +111,43 @@ class SalesController {
 
                 $vatable = 0;
                 $vatAmount = 0;
-                $totalDue = 0;
-                $zeroRated = 0;
-                $vatExempt = 0;
+                $grossTotal = 0;
 
                 foreach ($allLines as $line) {
                     $amount = floatval($line['amount']);
-                    $totalDue += $amount;
                     
                     // VAT Calculation Logic
                     if ($line['is_vat_inc']) {
-                        // Inclusive: Extract VAT
+                        // Inclusive
+                        $grossTotal += $amount;
                         $net = $amount / 1.12;
                         $vat = $amount - $net;
                     } else {
-                        // Exclusive: Add VAT
+                        // Exclusive
                         $net = $amount;
                         $vat = $amount * 0.12;
-                        $totalDue += $vat; // Increase total due
+                        $grossTotal += ($amount + $vat);
                     }
-
                     $vatable += $net;
                     $vatAmount += $vat;
                 }
 
-                // C. Insert Invoice Header
-                $sql = "INSERT INTO sales_invoices (company_id, invoice_number, date, customer_name, tin, address, business_style, terms, vatable_sales, vat_amount, total_amount_due, status) 
-                        VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid')";
+                // C. Calculate Net Amount Receivable
+                // This matches the "Paid Amt" in your screenshot
+                $netAmountDue = $grossTotal - $whtAmount;
+
+                // D. Insert Invoice Header
+                $sql = "INSERT INTO sales_invoices (company_id, invoice_number, date, customer_name, tin, address, business_style, terms, vatable_sales, vat_amount, total_amount_due, wht_amount, net_amount_due, status) 
+                        VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid')";
                 $stmt = $db->prepare($sql);
                 $stmt->execute([
                     $invNum, $_POST['date'], $_POST['customer_name'], 
                     $_POST['tin'], $_POST['address'], $_POST['business_style'], $_POST['terms'],
-                    $vatable, $vatAmount, $totalDue
+                    $vatable, $vatAmount, $grossTotal, $whtAmount, $netAmountDue
                 ]);
                 $invId = $db->lastInsertId();
 
-                // D. Insert Invoice Lines
+                // E. Insert Invoice Lines
                 $insertLine = $db->prepare("INSERT INTO sales_invoice_lines (invoice_id, source_dr_number, item_code, description, quantity, uom, unit_price, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
                 foreach ($allLines as $line) {
                     $insertLine->execute([
@@ -153,7 +156,7 @@ class SalesController {
                     ]);
                 }
 
-                // E. Link DRs and Mark as Invoiced
+                // F. Link DRs and Mark as Invoiced
                 $linkStmt = $db->prepare("INSERT INTO dr_invoice_links (invoice_id, dr_id) VALUES (?, ?)");
                 $updateDr = $db->prepare("UPDATE delivery_receipts SET invoice_status = 'invoiced' WHERE id = ?");
 
@@ -162,13 +165,10 @@ class SalesController {
                     $updateDr->execute([$drId]);
                 }
 
-                // F. Update Booklet Counter (Auto-increment)
+                // G. Update Booklet Counter
                 if ($booklet) {
                     $newCounter = intval($invNum) + 1;
-                    // If we reached the end, mark full
                     $status = ($newCounter > $booklet['series_end']) ? 'full' : 'active';
-                    
-                    // Only update if the new counter is higher than current (avoids messing up if you encode out of order)
                     if ($newCounter > $booklet['current_counter']) {
                         $db->prepare("UPDATE invoice_booklets SET current_counter = ?, status = ? WHERE id = ?")
                            ->execute([$newCounter, $status, $booklet['id']]);
