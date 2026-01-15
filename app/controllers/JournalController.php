@@ -34,9 +34,7 @@ class JournalController {
         $totalRecords = $stmtCount->fetch()['total'];
         $totalPages = ceil($totalRecords / $limit);
 
-        // Fetch Journals with their Lines (Grouped)
-        // Note: Fetching headers first, then we can lazy load lines or join. 
-        // For a clean UI, let's fetch headers and then fetch lines for each.
+        // Fetch Journals
         $sql = "SELECT * FROM journal_entries je WHERE $where ORDER BY date DESC, id DESC LIMIT $limit OFFSET $offset";
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
@@ -63,11 +61,8 @@ class JournalController {
     // --- CREATE MANUAL JV ---
     public function create() {
         $db = Database::getInstance();
-        
-        // Get Chart of Accounts
         $accounts = $db->query("SELECT * FROM accounts ORDER BY code ASC")->fetchAll();
         
-        // Suggest Next JV Number
         $lastJv = $db->query("SELECT reference_no FROM journal_entries WHERE source_module='manual' ORDER BY id DESC LIMIT 1")->fetch();
         $nextNum = 'JV-' . str_pad(($lastJv ? intval(substr($lastJv['reference_no'], 3)) + 1 : 1), 6, '0', STR_PAD_LEFT);
 
@@ -88,7 +83,6 @@ class JournalController {
                 $desc = $_POST['description'];
                 $lines = json_decode($_POST['lines_json'], true);
 
-                // 1. Validate Balance
                 $totalDebit = 0;
                 $totalCredit = 0;
                 foreach($lines as $l) {
@@ -96,33 +90,24 @@ class JournalController {
                     $totalCredit += floatval($l['credit']);
                 }
                 
-                // Allow small floating point difference
                 if (abs($totalDebit - $totalCredit) > 0.01) {
                     throw new Exception("Journal Entry is not balanced. Debit: $totalDebit, Credit: $totalCredit");
                 }
 
-                // 2. Insert Header
                 $stmt = $db->prepare("INSERT INTO journal_entries (company_id, date, reference_no, description, source_module, status) VALUES (1, ?, ?, ?, 'manual', 'posted')");
                 $stmt->execute([$date, $ref, $desc]);
                 $journalId = $db->lastInsertId();
 
-                // 3. Insert Lines
                 $stmtLine = $db->prepare("INSERT INTO journal_lines (journal_id, account_id, description, debit, credit) VALUES (?, ?, ?, ?, ?)");
                 
                 foreach ($lines as $l) {
                     $stmtLine->execute([
                         $journalId, 
                         $l['account_id'], 
-                        $l['description'] ?: $desc, // Use header desc if line desc empty
+                        $l['description'] ?: $desc, 
                         floatval($l['debit']), 
                         floatval($l['credit'])
                     ]);
-                    
-                    // 4. Update Account Current Balance (Simple accumulation)
-                    // Asset/Expense: Debit increases, Credit decreases
-                    // Liab/Equity/Income: Credit increases, Debit decreases
-                    // For simplicity in this non-coder setup, we might skip complex balance caching 
-                    // and rely on Reports to sum up transactions later.
                 }
 
                 $db->commit();
@@ -134,8 +119,9 @@ class JournalController {
             }
         }
     }
+
     // --- STATIC HELPER: AUTO-POST FROM OTHER MODULES ---
-    // This allows Sales, Bills, etc. to create journal entries easily
+    // UPDATED: Now supports both 'account_id' OR 'code'
     public static function post($date, $ref, $desc, $module, $sourceId, $lines) {
         $db = Database::getInstance();
         
@@ -148,18 +134,28 @@ class JournalController {
         $stmtLine = $db->prepare("INSERT INTO journal_lines (journal_id, account_id, description, debit, credit) VALUES (?, ?, ?, ?, ?)");
         
         foreach ($lines as $l) {
-            // Find Account ID based on Code (We assume you have these standard codes)
-            // You might need to adjust these codes to match your specific Chart of Accounts
-            $acc = $db->query("SELECT id FROM accounts WHERE code = '{$l['code']}'")->fetch();
-            $accId = $acc ? $acc['id'] : 0; // Fallback to 0 if not found (needs setup)
+            $accId = 0;
 
-            $stmtLine->execute([
-                $journalId, 
-                $accId, 
-                $l['desc'], 
-                floatval($l['debit']), 
-                floatval($l['credit'])
-            ]);
+            // FIX: Check if ID is provided directly (Bank Module does this)
+            if (isset($l['account_id']) && !empty($l['account_id'])) {
+                $accId = $l['account_id'];
+            } 
+            // Otherwise, look up by Code (Sales Module does this)
+            elseif (isset($l['code'])) {
+                $acc = $db->query("SELECT id FROM accounts WHERE code = '{$l['code']}'")->fetch();
+                $accId = $acc ? $acc['id'] : 0;
+            }
+
+            // Only insert if we found a valid account ID
+            if ($accId > 0) {
+                $stmtLine->execute([
+                    $journalId, 
+                    $accId, 
+                    $l['desc'] ?? $desc, // Fallback description
+                    floatval($l['debit']), 
+                    floatval($l['credit'])
+                ]);
+            }
         }
     }
 }

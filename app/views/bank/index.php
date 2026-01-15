@@ -20,19 +20,25 @@
             <?php foreach ($passbooks as $pb): ?>
             <tr class="hover:bg-gray-50">
                 <td class="px-6 py-4 font-bold text-gray-800">
-                    <?php echo htmlspecialchars($pb['name']); ?>
-                    <div class="text-xs text-gray-400 font-normal"><?php echo htmlspecialchars($pb['bank_name']); ?></div>
+                    <?php echo htmlspecialchars($pb['name'] ?? ''); ?>
+                    <div class="text-xs text-gray-400 font-normal">
+                        <?php echo htmlspecialchars($pb['bank_name'] ?? ''); ?>
+                    </div>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-600 font-mono"><?php echo htmlspecialchars($pb['account_number']); ?></td>
+                <td class="px-6 py-4 text-sm text-gray-600 font-mono">
+                    <?php echo htmlspecialchars($pb['account_number'] ?? ''); ?>
+                </td>
                 <td class="px-6 py-4 text-sm">
-                    <?php if($pb['gl_code']): ?>
-                        <span class="text-blue-600 font-bold font-mono"><?= $pb['gl_code'] ?></span> 
-                        <span class="text-gray-600">- <?= $pb['gl_name'] ?></span>
+                    <?php if(!empty($pb['gl_code'])): ?>
+                        <span class="text-blue-600 font-bold font-mono"><?= htmlspecialchars($pb['gl_code']) ?></span> 
+                        <span class="text-gray-600">- <?= htmlspecialchars($pb['gl_name'] ?? '') ?></span>
                     <?php else: ?>
                         <span class="text-red-400 italic text-xs">Unlinked</span>
                     <?php endif; ?>
                 </td>
-                <td class="px-6 py-4 text-right font-bold text-gray-900">₱<?php echo number_format($pb['current_balance'], 2); ?></td>
+                <td class="px-6 py-4 text-right font-bold text-gray-900">
+                    ₱<?php echo number_format($pb['current_balance'] ?? 0, 2); ?>
+                </td>
                 <td class="px-6 py-4 text-center text-sm">
                     <a href="/bank/passbooks/view?id=<?php echo $pb['id']; ?>" class="text-blue-600 hover:text-blue-800 font-medium">View Ledger</a>
                 </td>
