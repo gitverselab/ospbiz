@@ -4,13 +4,20 @@
         <a href="/revenue/dr/create" class="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700 shadow font-bold">
             <i class="fa-solid fa-plus"></i> Manual Input
         </a>
+        
         <div class="h-8 w-px bg-gray-300 mx-1"></div>
+        
         <a href="/revenue/dr/template" class="bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700">
             <i class="fa-solid fa-download"></i> Template
         </a>
+        
         <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600">
             <i class="fa-solid fa-file-import"></i> Import CSV
         </button>
+        
+        <a href="/revenue/dr/export" class="bg-gray-600 text-white px-3 py-2 rounded text-sm hover:bg-gray-700">
+            <i class="fa-solid fa-file-export"></i> Export
+        </a>
     </div>
 </div>
 
