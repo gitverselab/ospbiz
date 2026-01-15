@@ -134,4 +134,32 @@ class JournalController {
             }
         }
     }
+    // --- STATIC HELPER: AUTO-POST FROM OTHER MODULES ---
+    // This allows Sales, Bills, etc. to create journal entries easily
+    public static function post($date, $ref, $desc, $module, $sourceId, $lines) {
+        $db = Database::getInstance();
+        
+        // 1. Insert Header
+        $stmt = $db->prepare("INSERT INTO journal_entries (company_id, date, reference_no, description, source_module, source_id, status) VALUES (1, ?, ?, ?, ?, ?, 'posted')");
+        $stmt->execute([$date, $ref, $desc, $module, $sourceId]);
+        $journalId = $db->lastInsertId();
+
+        // 2. Insert Lines
+        $stmtLine = $db->prepare("INSERT INTO journal_lines (journal_id, account_id, description, debit, credit) VALUES (?, ?, ?, ?, ?)");
+        
+        foreach ($lines as $l) {
+            // Find Account ID based on Code (We assume you have these standard codes)
+            // You might need to adjust these codes to match your specific Chart of Accounts
+            $acc = $db->query("SELECT id FROM accounts WHERE code = '{$l['code']}'")->fetch();
+            $accId = $acc ? $acc['id'] : 0; // Fallback to 0 if not found (needs setup)
+
+            $stmtLine->execute([
+                $journalId, 
+                $accId, 
+                $l['desc'], 
+                floatval($l['debit']), 
+                floatval($l['credit'])
+            ]);
+        }
+    }
 }

@@ -197,8 +197,50 @@ class SalesController {
                            ->execute([$newCounter, $status, $booklet['id']]);
                     }
                 }
+                // ... (After linking DRs and Booklet update) ...
 
-                $db->commit();
+                // H. AUTOMATIC JOURNAL ENTRY (The "Pipe")
+                // 1. Define the Accounting Entries
+                $entries = [];
+
+                // Entry 1: Debit Accounts Receivable (Total Gross Amount)
+                $entries[] = [
+                    'code' => '1200', // Ensure this matches your COA "Accounts Receivable"
+                    'desc' => "Invoice #$invNum - {$_POST['customer_name']}",
+                    'debit' => $grossTotal,
+                    'credit' => 0
+                ];
+
+                // Entry 2: Credit VAT Payable (Output VAT)
+                if ($vatAmount > 0) {
+                    $entries[] = [
+                        'code' => '2500', // Ensure this matches "VAT Payable"
+                        'desc' => "Output VAT - Inv #$invNum",
+                        'debit' => 0,
+                        'credit' => $vatAmount
+                    ];
+                }
+
+                // Entry 3: Credit Sales Revenue (Vatable Sales)
+                $entries[] = [
+                    'code' => '4000', // Ensure this matches "Sales"
+                    'desc' => "Sales Revenue - Inv #$invNum",
+                    'debit' => 0,
+                    'credit' => $vatable
+                ];
+
+                // Call the Journal Helper
+                require_once ROOT_PATH . '/app/controllers/JournalController.php';
+                JournalController::post(
+                    $_POST['date'], 
+                    $invNum, 
+                    "Sales Invoice to {$_POST['customer_name']}", 
+                    'sales', 
+                    $invId, 
+                    $entries
+                );
+
+                $db->commit(); // <--- Commit AFTER posting to Journal
                 header("Location: /revenue/sales");
 
             } catch (Exception $e) {

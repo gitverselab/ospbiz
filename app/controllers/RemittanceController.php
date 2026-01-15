@@ -151,7 +151,51 @@ class RemittanceController {
                 $db->prepare("INSERT INTO account_transactions (financial_account_id, date, type, amount, description, reference_no) VALUES (?, ?, 'debit', ?, ?, ?)")
                    ->execute([$bankId, $date, $netReceived, $desc, $ref]);
 
-                $db->commit();
+                // 8. AUTOMATIC JOURNAL ENTRY
+                $entries = [];
+
+                // Entry 1: Debit Cash in Bank (Net Amount Received)
+                // We need to fetch the Account Code of the selected Bank
+                $bankAcc = $db->query("SELECT code FROM accounts WHERE id = (SELECT account_id FROM financial_accounts WHERE id=$bankId)")->fetch();
+                $bankCode = $bankAcc['code'] ?? '1010'; // Fallback if not linked
+
+                $entries[] = [
+                    'code' => $bankCode, 
+                    'desc' => "Payment from $customer (Ref: $ref)",
+                    'debit' => $netReceived,
+                    'credit' => 0
+                ];
+
+                // Entry 2: Debit Creditable Withholding Tax (CWT)
+                if ($totalWht > 0) {
+                    $entries[] = [
+                        'code' => '1300', // Ensure this matches "Creditable Withholding Tax"
+                        'desc' => "CWT (1%) - Ref: $ref",
+                        'debit' => $totalWht,
+                        'credit' => 0
+                    ];
+                }
+
+                // Entry 3: Credit Accounts Receivable (Total Gross Amount Paid)
+                $entries[] = [
+                    'code' => '1200', // Accounts Receivable
+                    'desc' => "Payment Received - $customer",
+                    'debit' => 0,
+                    'credit' => $totalGross
+                ];
+
+                // Call the Journal Helper
+                require_once ROOT_PATH . '/app/controllers/JournalController.php';
+                JournalController::post(
+                    $date, 
+                    $ref, 
+                    "Collection from $customer", 
+                    'remittance', 
+                    $remitId, 
+                    $entries
+                );
+
+                $db->commit(); // <--- Commit AFTER posting
                 header("Location: /revenue/remittance");
 
             } catch (Exception $e) {
