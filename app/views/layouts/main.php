@@ -150,6 +150,9 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
             <a href="/settings/receipt" class="nav-link"<?php echo (strpos($uri, '/settings/receipt') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-scroll"></i> Receipt Settings
             </a>
+            <a href="/settings/categories" class="nav-link <?php echo (strpos($uri, '/settings/categories') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-tags"></i> Expense Categories
+            </a>
 
             <div class="nav-header">App System</div>
             <a href="/admin/users" class="nav-link <?php echo (strpos($uri, '/admin/users') === 0) ? 'active' : ''; ?>">

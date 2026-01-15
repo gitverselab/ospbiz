@@ -244,7 +244,19 @@ elseif ($uri === '/settings/receipt') {
 elseif ($uri === '/settings/receipt/update') {
     $c = new ReceiptSettingsController(); $c->update();
 }
-
+// --- SETTINGS: EXPENSE CATEGORIES ---
+elseif ($uri === '/settings/categories') {
+    $c = new ExpenseCategoryController(); $c->index();
+}
+elseif ($uri === '/settings/categories/store') {
+    $c = new ExpenseCategoryController(); $c->store();
+}
+elseif ($uri === '/settings/categories/update') {
+    $c = new ExpenseCategoryController(); $c->updateMapping();
+}
+elseif ($uri === '/settings/categories/delete') {
+    $c = new ExpenseCategoryController(); $c->delete();
+}
 // --- CATCH ALL (Under Construction) ---
 // THIS MUST BE LAST
 elseif (preg_match('#^/(bank|expenses|revenue|settings|admin)#', $uri)) {
