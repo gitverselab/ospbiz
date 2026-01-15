@@ -56,6 +56,24 @@ elseif ($uri === '/bank/checks/store') {
 elseif ($uri === '/bank/checks/status') {
     $c = new CheckController(); $c->updateStatus();
 }
+// --- BANK & CASH ---
+elseif (strpos($uri, '/bank/passbooks') === 0) {
+    $c = new BankController();
+    if ($uri === '/bank/passbooks') $c->index();
+    elseif ($uri === '/bank/passbooks/create') $c->store();
+    elseif ($uri === '/bank/passbooks/view') $c->show();
+    elseif ($uri === '/bank/passbooks/transaction') $c->storeTransaction();
+}
+// --- BANK: FUND TRANSFERS ---
+elseif ($uri === '/bank/transfers') {
+    $c = new FundTransferController(); $c->index();
+}
+elseif ($uri === '/bank/transfers/create') {
+    $c = new FundTransferController(); $c->create();
+}
+elseif ($uri === '/bank/transfers/store') {
+    $c = new FundTransferController(); $c->store();
+}
 // --- EXPENSES: PURCHASES ---
 elseif ($uri === '/expenses/purchases') {
     $c = new PurchaseController(); $c->index();
@@ -142,14 +160,6 @@ elseif ($uri === '/expenses/loan-payments/create') {
 elseif ($uri === '/expenses/loan-payments/store') {
     $c = new LoanPaymentController(); $c->store();
 }
-// --- BANK & CASH ---
-elseif (strpos($uri, '/bank/passbooks') === 0) {
-    $c = new BankController();
-    if ($uri === '/bank/passbooks') $c->index();
-    elseif ($uri === '/bank/passbooks/create') $c->store();
-    elseif ($uri === '/bank/passbooks/view') $c->show();
-    elseif ($uri === '/bank/passbooks/transaction') $c->storeTransaction();
-}
 elseif (strpos($uri, '/bank/cash-on-hand') === 0) {
     $c = new CashController();
     if ($uri === '/bank/cash-on-hand') $c->index();
@@ -159,7 +169,6 @@ elseif (strpos($uri, '/bank/cash-on-hand') === 0) {
     elseif ($uri === '/bank/cash-on-hand/transaction/update') $c->updateTransaction();
     elseif ($uri === '/bank/cash-on-hand/transaction/delete') $c->deleteTransaction();
 }
-
 // --- SETTINGS ---
 elseif ($uri === '/settings/coa') {
     $c = new COAController(); $c->index();
