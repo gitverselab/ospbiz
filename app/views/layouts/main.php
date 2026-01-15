@@ -1,5 +1,5 @@
 <?php
-// 1. FIX: Get the current URL so we can highlight the correct menu item
+// 1. Get the current URL so we can highlight the correct menu item
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 ?>
 <!DOCTYPE html>
@@ -80,6 +80,15 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
             <a href="/revenue/rts" class="nav-link <?php echo (strpos($uri, '/revenue/rts') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-rotate-left"></i> RTS Management
             </a>
+            <a href="/revenue/imports" class="nav-link <?php echo (strpos($uri, '/revenue/imports') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-ship"></i> Import Receipts
+            </a>
+            <a href="/revenue/sales" class="nav-link <?php echo (strpos($uri, '/revenue/sales') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-cash-register"></i> Sales
+            </a>
+            <a href="/revenue/remittance" class="nav-link <?php echo (strpos($uri, '/revenue/remittance') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-hand-holding-dollar"></i> Remittance
+            </a>
 
             <div class="nav-header">Expenses</div>
             
@@ -114,6 +123,17 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
                 <i class="fa-solid fa-money-bill-wave"></i> Loan Payments
             </a>
 
+            <div class="nav-header">Accounting</div>
+            <a href="/journal/create" class="nav-link <?php echo (strpos($uri, '/journal/create') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-pen-fancy"></i> Journal Entry
+            </a>
+            <a href="/journal/list" class="nav-link <?php echo (strpos($uri, '/journal/list') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-list-check"></i> View Journals
+            </a>
+            <a href="/reports" class="nav-link <?php echo (strpos($uri, '/reports') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-chart-pie"></i> Reports
+            </a>
+
             <div class="nav-header">Settings</div>
             <a href="/settings/coa" class="nav-link <?php echo (strpos($uri, '/settings/coa') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-sitemap"></i> Chart of Accounts
@@ -123,6 +143,17 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
             </a>
             <a href="/settings/customers" class="nav-link <?php echo (strpos($uri, '/settings/customers') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-user-tag"></i> Customers
+            </a>
+            <a href="/settings/items" class="nav-link <?php echo (strpos($uri, '/settings/items') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-box"></i> Items
+            </a>
+
+            <div class="nav-header">App System</div>
+            <a href="/admin/users" class="nav-link <?php echo (strpos($uri, '/admin/users') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-user-gear"></i> Manage Users
+            </a>
+            <a href="/audit/logs" class="nav-link <?php echo (strpos($uri, '/audit/logs') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-shield-halved"></i> Audit Trail
             </a>
         </nav>
 
@@ -178,25 +209,32 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
     </main>
 
     <script>
+        // 1. Toggle Sidebar Logic
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
             
-            // Toggle sidebar position
             if (sidebar.classList.contains('-translate-x-full')) {
-                // Open Sidebar
                 sidebar.classList.remove('-translate-x-full');
-                // Show Overlay
                 overlay.classList.remove('hidden');
-                setTimeout(() => overlay.classList.remove('opacity-0'), 10); // Fade in
+                setTimeout(() => overlay.classList.remove('opacity-0'), 10);
             } else {
-                // Close Sidebar
                 sidebar.classList.add('-translate-x-full');
-                // Hide Overlay
                 overlay.classList.add('opacity-0');
-                setTimeout(() => overlay.classList.add('hidden'), 300); // Wait for fade out
+                setTimeout(() => overlay.classList.add('hidden'), 300);
             }
         }
+
+        // 2. NEW: Auto-Scroll to Active Link
+        document.addEventListener("DOMContentLoaded", function() {
+            // Find the link with the 'active' class
+            const activeLink = document.querySelector('.nav-link.active');
+            
+            if (activeLink) {
+                // Scroll the link into view (centers it in the menu)
+                activeLink.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+        });
     </script>
 </body>
 </html>
