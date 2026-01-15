@@ -60,7 +60,8 @@ elseif ($uri === '/bank/checks/status') {
 elseif (strpos($uri, '/bank/passbooks') === 0) {
     $c = new BankController();
     if ($uri === '/bank/passbooks') $c->index();
-    elseif ($uri === '/bank/passbooks/create') $c->store();
+    // FIX: Change 'create' to 'store' to match your form
+    elseif ($uri === '/bank/passbooks/store') $c->store(); 
     elseif ($uri === '/bank/passbooks/view') $c->show();
     elseif ($uri === '/bank/passbooks/transaction') $c->storeTransaction();
 }
