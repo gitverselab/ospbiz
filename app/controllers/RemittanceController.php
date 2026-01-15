@@ -4,22 +4,60 @@ class RemittanceController {
     // --- LIST REMITTANCES ---
     public function index() {
         $db = Database::getInstance();
+        
         $search = $_GET['search'] ?? '';
+        $customer = $_GET['customer'] ?? '';
+        $fromDate = $_GET['from'] ?? '';
+        $toDate = $_GET['to'] ?? '';
+        
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+        $offset = ($page - 1) * $limit;
+
         $where = "1=1";
         $params = [];
 
         if($search) {
-            $where .= " AND (customer_name LIKE ? OR reference_no LIKE ?)";
-            $params[] = "%$search%"; $params[] = "%$search%";
+            $where .= " AND (reference_no LIKE ?)";
+            $params[] = "%$search%"; 
+        }
+        if($customer) {
+            $where .= " AND customer_name = ?";
+            $params[] = $customer;
+        }
+        if($fromDate) {
+            $where .= " AND date >= ?";
+            $params[] = $fromDate;
+        }
+        if($toDate) {
+            $where .= " AND date <= ?";
+            $params[] = $toDate;
         }
 
+        // Pagination Count
+        $stmtCount = $db->prepare("SELECT COUNT(*) as total FROM payment_remittances WHERE $where");
+        $stmtCount->execute($params);
+        $totalRecords = $stmtCount->fetch()['total'];
+        $totalPages = ceil($totalRecords / $limit);
+
+        // Fetch Data
         $sql = "SELECT pr.*, fa.name as bank_name 
                 FROM payment_remittances pr
                 LEFT JOIN financial_accounts fa ON pr.financial_account_id = fa.id
-                WHERE $where ORDER BY date DESC";
+                WHERE $where ORDER BY date DESC LIMIT $limit OFFSET $offset";
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $remittances = $stmt->fetchAll();
+
+        // Get Customers for Dropdown
+        $customers = $db->query("SELECT DISTINCT customer_name FROM payment_remittances ORDER BY customer_name")->fetchAll();
+
+        $filters = [
+            'search' => $search, 'customer' => $customer, 
+            'from' => $fromDate, 'to' => $toDate,
+            'page' => $page, 'limit' => $limit, 
+            'total_pages' => $totalPages, 'total_records' => $totalRecords
+        ];
 
         $pageTitle = "Payment Remittances";
         $childView = ROOT_PATH . '/app/views/revenue/remittance/index.php';

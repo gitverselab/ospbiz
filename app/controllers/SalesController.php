@@ -5,39 +5,62 @@ class SalesController {
     public function index() {
         $db = Database::getInstance();
         
-        // Filter Parameters
+        // 1. Get Filters
         $search = $_GET['search'] ?? '';
+        $customer = $_GET['customer'] ?? '';
+        $fromDate = $_GET['from'] ?? '';
+        $toDate = $_GET['to'] ?? '';
+        $status = $_GET['status'] ?? '';
+        
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-        $limit = 10;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
         $offset = ($page - 1) * $limit;
 
-        // Build Query
+        // 2. Build Query
         $where = "1=1";
         $params = [];
 
         if($search) {
-            $where .= " AND (invoice_number LIKE ? OR customer_name LIKE ?)";
+            $where .= " AND invoice_number LIKE ?";
             $params[] = "%$search%"; 
-            $params[] = "%$search%";
+        }
+        if($customer) {
+            $where .= " AND customer_name = ?";
+            $params[] = $customer;
+        }
+        if($fromDate) {
+            $where .= " AND date >= ?";
+            $params[] = $fromDate;
+        }
+        if($toDate) {
+            $where .= " AND date <= ?";
+            $params[] = $toDate;
+        }
+        if($status) {
+            $where .= " AND status = ?";
+            $params[] = $status;
         }
 
-        // Pagination Count
+        // 3. Pagination Count
         $stmtCount = $db->prepare("SELECT COUNT(*) as total FROM sales_invoices WHERE $where");
         $stmtCount->execute($params);
         $totalRecords = $stmtCount->fetch()['total'];
         $totalPages = ceil($totalRecords / $limit);
 
-        // Fetch Data
+        // 4. Fetch Data
         $sql = "SELECT * FROM sales_invoices WHERE $where ORDER BY date DESC, id DESC LIMIT $limit OFFSET $offset";
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $invoices = $stmt->fetchAll();
 
+        // 5. Get Unique Customers for Dropdown
+        $customers = $db->query("SELECT DISTINCT customer_name FROM sales_invoices ORDER BY customer_name")->fetchAll();
+
         $filters = [
-            'search' => $search, 
-            'page' => $page, 
-            'total_pages' => $totalPages, 
-            'total_records' => $totalRecords
+            'search' => $search, 'customer' => $customer, 
+            'from' => $fromDate, 'to' => $toDate, 'status' => $status,
+            'page' => $page, 'limit' => $limit, 
+            'total_pages' => $totalPages, 'total_records' => $totalRecords
         ];
 
         $pageTitle = "Sales Invoices";
