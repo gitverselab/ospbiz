@@ -1,42 +1,138 @@
 <div class="flex justify-between items-center mb-6">
     <h2 class="text-2xl font-bold text-gray-800">RTS Management</h2>
     <div class="flex gap-2">
-        <a href="/revenue/rts/template" class="bg-green-600 text-white px-3 py-2 rounded text-sm">Download Template</a>
-        <button onclick="document.getElementById('importRts').classList.remove('hidden')" class="bg-blue-600 text-white px-3 py-2 rounded text-sm">Import CSV</button>
+        <a href="/revenue/rts/create" class="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700 shadow font-bold">
+            <i class="fa-solid fa-plus"></i> Manual Input
+        </a>
+        <div class="h-8 w-px bg-gray-300 mx-1"></div>
+        <a href="/revenue/rts/template" class="bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700">
+            <i class="fa-solid fa-download"></i> Template
+        </a>
+        <button onclick="document.getElementById('importRts').classList.remove('hidden')" class="bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600">
+            <i class="fa-solid fa-file-import"></i> Import CSV
+        </button>
+        <a href="/revenue/rts/export" class="bg-gray-600 text-white px-3 py-2 rounded text-sm hover:bg-gray-700">
+            <i class="fa-solid fa-file-export"></i> Export
+        </a>
     </div>
 </div>
+
+<form method="GET" action="/revenue/rts" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
+    <div class="flex flex-col md:flex-row gap-4 items-end">
+        
+        <div class="flex-1 w-full">
+            <label class="text-xs font-bold text-gray-500 uppercase">Search</label>
+            <input type="text" name="search" value="<?= htmlspecialchars($filters['search']) ?>" placeholder="RD, GR, PO or Item..." class="w-full border p-2 rounded text-sm">
+        </div>
+
+        <div class="w-full md:w-48">
+            <label class="text-xs font-bold text-gray-500 uppercase">Plant / Customer</label>
+            <select name="plant" class="w-full border p-2 rounded text-sm bg-white">
+                <option value="">All Plants</option>
+                <?php foreach($plants as $p): ?>
+                    <option value="<?= htmlspecialchars($p['plant_name']) ?>" <?= ($filters['plant'] == $p['plant_name']) ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($p['plant_name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div class="w-full md:w-32">
+            <label class="text-xs font-bold text-gray-500 uppercase">From</label>
+            <input type="date" name="from" value="<?= htmlspecialchars($filters['from']) ?>" class="w-full border p-2 rounded text-sm">
+        </div>
+        <div class="w-full md:w-32">
+            <label class="text-xs font-bold text-gray-500 uppercase">To</label>
+            <input type="date" name="to" value="<?= htmlspecialchars($filters['to']) ?>" class="w-full border p-2 rounded text-sm">
+        </div>
+
+        <div class="w-full md:w-24">
+            <label class="text-xs font-bold text-gray-500 uppercase">Show</label>
+            <select name="limit" class="w-full border p-2 rounded text-sm bg-white" onchange="this.form.submit()">
+                <option value="10" <?= ($filters['limit'] == 10) ? 'selected' : '' ?>>10</option>
+                <option value="25" <?= ($filters['limit'] == 25) ? 'selected' : '' ?>>25</option>
+                <option value="50" <?= ($filters['limit'] == 50) ? 'selected' : '' ?>>50</option>
+            </select>
+        </div>
+
+        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded text-sm font-medium hover:bg-blue-700">Filter</button>
+    </div>
+</form>
 
 <div class="bg-white rounded shadow overflow-hidden">
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
-                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">RD Number</th>
+                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">RD # / Orig GR</th>
                 <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Date</th>
-                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Plant</th>
-                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Orig GR #</th>
+                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Plant Name</th>
+                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Item Description</th>
+                <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Qty</th>
+                <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Total</th>
+                <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Status</th>
             </tr>
         </thead>
-        <tbody>
-            <?php foreach($rts as $r): ?>
-            <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 text-sm font-mono text-red-600"><?= $r['rd_number'] ?></td>
-                <td class="px-6 py-4 text-sm"><?= $r['date'] ?></td>
-                <td class="px-6 py-4 text-sm"><?= $r['plant_name'] ?></td>
-                <td class="px-6 py-4 text-sm"><?= $r['gr_number'] ?></td>
-            </tr>
-            <?php endforeach; ?>
+        <tbody class="divide-y divide-gray-200 bg-white">
+            <?php if(empty($rts)): ?>
+                <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500 italic">No return records found.</td></tr>
+            <?php else: ?>
+                <?php foreach($rts as $r): 
+                    $incVat = $r['is_vat_inc'] ? $r['amount'] : ($r['amount'] * 1.12);
+                ?>
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4">
+                        <div class="text-sm font-bold text-red-600"><?= htmlspecialchars($r['rd_number']) ?></div>
+                        <div class="text-xs text-gray-500">Orig GR: <?= htmlspecialchars($r['gr_number']) ?></div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-700"><?= $r['date'] ?></td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-800">
+                        <?= htmlspecialchars($r['plant_name']) ?>
+                        <div class="text-xs text-gray-400"><?= htmlspecialchars($r['plant_code']) ?></div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm text-gray-800"><?= htmlspecialchars($r['description']) ?></div>
+                        <div class="text-xs text-gray-500">Item: <?= htmlspecialchars($r['item_code']) ?></div>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <div class="text-sm text-gray-800"><?= number_format($r['quantity'], 2) ?></div>
+                        <div class="text-xs text-gray-500"><?= htmlspecialchars($r['uom']) ?></div>
+                    </td>
+                    <td class="px-6 py-4 text-right text-sm font-bold text-gray-800">
+                        <?= $r['currency'] ?> <?= number_format($incVat, 2) ?>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="px-3 py-1 text-xs font-bold text-white rounded-full 
+                            <?= ($r['status'] == 'received') ? 'bg-green-500' : 'bg-orange-500' ?>">
+                            <?= ucfirst($r['status']) ?>
+                        </span>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </tbody>
     </table>
 </div>
 
-<div id="importRts" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-    <div class="bg-white p-6 rounded w-96">
-        <h3 class="font-bold mb-4">Import RTS CSV</h3>
+<div class="flex justify-between items-center mt-4">
+    <div class="text-sm text-gray-500">Page <?= $filters['page'] ?> of <?= $filters['total_pages'] ?></div>
+    <div class="flex gap-2">
+        <?php 
+            $params = $_GET; unset($params['page']); 
+            $baseUrl = '?' . http_build_query($params) . '&page=';
+        ?>
+        <?php if ($filters['page'] > 1): ?><a href="<?= $baseUrl . ($filters['page'] - 1) ?>" class="px-3 py-1 bg-white border rounded text-sm">Prev</a><?php endif; ?>
+        <?php if ($filters['page'] < $filters['total_pages']): ?><a href="<?= $baseUrl . ($filters['page'] + 1) ?>" class="px-3 py-1 bg-white border rounded text-sm">Next</a><?php endif; ?>
+    </div>
+</div>
+
+<div id="importRts" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg shadow-xl w-96">
+        <h3 class="font-bold text-lg mb-4 text-gray-800">Import RTS CSV</h3>
         <form action="/revenue/rts/import" method="POST" enctype="multipart/form-data">
-            <input type="file" name="csv_file" accept=".csv" required class="w-full border p-2 mb-4">
+            <input type="file" name="csv_file" accept=".csv" required class="w-full border p-2 mb-4 rounded bg-gray-50 text-sm">
             <div class="flex justify-end gap-2">
-                <button type="button" onclick="document.getElementById('importRts').classList.add('hidden')" class="px-3 py-1 bg-gray-200 rounded">Cancel</button>
-                <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded">Upload</button>
+                <button type="button" onclick="document.getElementById('importRts').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Upload</button>
             </div>
         </form>
     </div>
