@@ -10,7 +10,7 @@ class ReceiptSettingsController {
         // Fetch Settings (Just Company Info now)
         $settings = $db->query("SELECT * FROM receipt_settings LIMIT 1")->fetch();
         
-        $pageTitle = "Invoice Booklet Management";
+        $pageTitle = "Receipt Settings";
         $childView = ROOT_PATH . '/app/views/settings/receipt/index.php';
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
