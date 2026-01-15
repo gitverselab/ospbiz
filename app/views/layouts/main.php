@@ -64,7 +64,7 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
                 <i class="fa-solid fa-book"></i> Passbooks
             </a>
             <a href="/bank/cash-on-hand" class="nav-link <?php echo (strpos($uri, '/bank/cash-on-hand') === 0) ? 'active' : ''; ?>">
-                <i class="fa-solid fa-wallet"></i> Petty Cash
+                <i class="fa-solid fa-wallet"></i> Cash On Hand
             </a>
             <a href="/bank/transfers" class="nav-link <?php echo (strpos($uri, '/bank/transfers') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-arrow-right-arrow-left"></i> Fund Transfers
