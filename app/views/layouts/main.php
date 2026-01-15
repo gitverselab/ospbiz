@@ -84,7 +84,7 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
                 <i class="fa-solid fa-ship"></i> Import Receipts
             </a>
             <a href="/revenue/sales" class="nav-link <?php echo (strpos($uri, '/revenue/sales') === 0) ? 'active' : ''; ?>">
-                <i class="fa-solid fa-cash-register"></i> Sales
+                <i class="fa-solid fa-cash-register"></i> Sales Invoices
             </a>
             <a href="/revenue/remittance" class="nav-link <?php echo (strpos($uri, '/revenue/remittance') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-hand-holding-dollar"></i> Remittance
@@ -146,6 +146,9 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
             </a>
             <a href="/settings/items" class="nav-link <?php echo (strpos($uri, '/settings/items') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-box"></i> Items
+            </a>
+            <a href="/settings/receipt" class="nav-link"<?php echo (strpos($uri, '/settings/receipt') === 0) ? 'active' : ''; ?>">
+                <i class="fa-solid fa-scroll"></i> Receipt Settings
             </a>
 
             <div class="nav-header">App System</div>

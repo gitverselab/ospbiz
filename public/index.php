@@ -198,6 +198,16 @@ elseif ($uri === '/revenue/rts/import') {
 elseif ($uri === '/revenue/rts/template') {
     $c = new RtsController(); $c->template();
 }
+// --- REVENUE: SALES INVOICES ---
+elseif ($uri === '/revenue/sales') {
+    $c = new SalesController(); $c->index();
+}
+elseif ($uri === '/revenue/sales/create') {
+    $c = new SalesController(); $c->create();
+}
+elseif ($uri === '/revenue/sales/store') {
+    $c = new SalesController(); $c->store();
+}
 // --- SETTINGS ---
 elseif ($uri === '/settings/coa') {
     $c = new COAController(); $c->index();
@@ -216,6 +226,13 @@ elseif ($uri === '/settings/customers') {
 }
 elseif ($uri === '/settings/customers/create') {
     $c = new ContactController(); $c->createCustomer();
+}
+// --- RECEIPT ---
+elseif ($uri === '/settings/receipt') {
+    $c = new ReceiptSettingsController(); $c->index();
+}
+elseif ($uri === '/settings/receipt/update') {
+    $c = new ReceiptSettingsController(); $c->update();
 }
 
 // --- CATCH ALL (Under Construction) ---
