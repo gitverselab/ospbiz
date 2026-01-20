@@ -16,7 +16,8 @@ class DailyExpenseController {
         $offset = ($page - 1) * $limit;
 
         // --- 2. BUILD QUERY ---
-        $whereSql = "t.type = 'credit'"; // Expenses are credits (money out)
+        // FIX: Only show credits from CASH accounts (ignore Bank/Checks)
+        $whereSql = "t.type = 'credit' AND fa.type = 'cash'";
         $params = [];
 
         // Apply Filters
