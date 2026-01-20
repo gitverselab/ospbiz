@@ -77,70 +77,72 @@ public function index() {
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
 
-    // --- CREATE EXPENSE (With Journal) ---
+// --- CREATE EXPENSE (With Check Logic) ---
     public function store() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
             try {
                 $db->beginTransaction();
 
-                $accId = $_POST['financial_account_id']; // Source (Cash/Bank)
+                // 1. Gather Inputs
+                $accId = $_POST['financial_account_id'];
                 $date = $_POST['date'];
                 $desc = $_POST['description'];
-                $catId = $_POST['category_id']; // This IS the Expense Account ID
+                $catId = $_POST['category_id'];
                 
+                // Determine Amount
                 $isPending = isset($_POST['is_pending_change']) ? 1 : 0;
                 $tendered = floatval($_POST['tendered_amount']);
-                $actual = floatval($_POST['actual_amount']);
+                // Note: In the view I named the actual input "amount" to make it easier
+                $amount = floatval($_POST['amount']); 
 
-                // If "Change Later", we deduct the full TENDERED amount now.
-                $amountToDeduct = $isPending ? $tendered : $actual;
+                // If "Change Later", we deduct the tendered amount. Otherwise, the actual amount.
+                $finalAmount = ($isPending) ? $tendered : $amount;
 
-                // 1. Save Transaction
+                // 2. CHECK LOGIC
+                // Check if this is a Bank Payment via Check
+                $payType = $_POST['payment_source_type'] ?? 'cash';
+                $payMethod = $_POST['payment_method'] ?? '';
+                
+                if ($payType === 'bank' && $payMethod === 'check') {
+                    $checkNum = $_POST['check_number'];
+                    $payee = $_POST['payee_name'];
+
+                    // A. Insert into Checks Table (Auto-Create in Registry)
+                    // Status is 'issued', source_type is 'expense' so we know where it came from
+                    $chkSql = "INSERT INTO checks (company_id, financial_account_id, check_number, payee_name, date, amount, memo, status, source_type) 
+                               VALUES (1, ?, ?, ?, ?, ?, ?, 'issued', 'expense')";
+                    $db->prepare($chkSql)->execute([$accId, $checkNum, $payee, $date, $finalAmount, $desc]);
+
+                    // B. Append Check Info to Description for reference
+                    $desc .= " (Check #$checkNum - $payee)";
+                }
+
+                // 3. Save Expense Transaction
                 $sql = "INSERT INTO account_transactions 
                         (financial_account_id, date, type, amount, description, contra_account_id, is_pending_change, tendered_amount) 
                         VALUES (?, ?, 'credit', ?, ?, ?, ?, ?)";
                 $stmt = $db->prepare($sql);
-                $stmt->execute([$accId, $date, $amountToDeduct, $desc, $catId, $isPending, $tendered]);
+                $stmt->execute([$accId, $date, $finalAmount, $desc, $catId, $isPending, $tendered]);
                 $transId = $db->lastInsertId();
 
-                // 2. Update Source Balance
+                // 4. Deduct Balance (Immediate Deduction Rule)
                 $update = $db->prepare("UPDATE financial_accounts SET current_balance = current_balance - ? WHERE id = ?");
-                $update->execute([$amountToDeduct, $accId]);
+                $update->execute([$finalAmount, $accId]);
 
-                // 3. AUTOMATIC JOURNAL ENTRY
-                // Get Source GL Account (e.g., Cash on Hand - 1000)
+                // 5. Journal Entry
                 $sourceInfo = $db->query("SELECT account_id FROM financial_accounts WHERE id = $accId")->fetch();
                 $sourceGLId = $sourceInfo['account_id'];
-                
-                // Expense GL Account is just $catId
                 
                 if ($sourceGLId && $catId && file_exists(ROOT_PATH . '/app/controllers/JournalController.php')) {
                     require_once ROOT_PATH . '/app/controllers/JournalController.php';
 
                     $lines = [
-                        [
-                            'account_id' => $catId,       // Debit: Expense (e.g. Market Expense)
-                            'desc' => $desc,
-                            'debit' => $amountToDeduct,
-                            'credit' => 0
-                        ],
-                        [
-                            'account_id' => $sourceGLId,  // Credit: Asset (e.g. Cash)
-                            'desc' => $desc,
-                            'debit' => 0,
-                            'credit' => $amountToDeduct
-                        ]
+                        ['account_id' => $catId, 'desc' => $desc, 'debit' => $finalAmount, 'credit' => 0],
+                        ['account_id' => $sourceGLId, 'desc' => $desc, 'debit' => 0, 'credit' => $finalAmount]
                     ];
 
-                    JournalController::post(
-                        $date, 
-                        'EXP-'.$transId, 
-                        $desc, 
-                        'daily_expense', 
-                        $transId, 
-                        $lines
-                    );
+                    JournalController::post($date, 'EXP-'.$transId, $desc, 'daily_expense', $transId, $lines);
                 }
 
                 $db->commit();

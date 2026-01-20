@@ -184,7 +184,7 @@
 </div>
 
 <div id="expenseModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div class="px-6 py-4 border-b border-gray-200">
             <h3 class="font-bold text-xl text-gray-800">Add New Expense</h3>
         </div>
@@ -199,9 +199,9 @@
                 
                 <div>
                     <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Pay From</label>
-                    <select id="payFromType" class="w-full border p-2 rounded text-sm bg-white" onchange="filterAccounts()">
+                    <select id="payFromType" name="payment_source_type" class="w-full border p-2 rounded text-sm bg-white" onchange="updateFormUI()">
                         <option value="cash">Cash on Hand</option>
-                        <option value="bank">Bank / Check</option>
+                        <option value="bank">Bank Account</option>
                     </select>
                 </div>
             </div>
@@ -212,8 +212,32 @@
                     </select>
             </div>
 
+            <div id="bankOptions" class="hidden bg-blue-50 p-3 rounded border border-blue-100 space-y-3">
+                <div class="flex items-center gap-4">
+                    <label class="flex items-center text-sm font-medium text-gray-700 cursor-pointer">
+                        <input type="radio" name="payment_method" value="transfer" class="mr-2" checked onchange="toggleCheckInputs()">
+                        Online Transfer / Debit
+                    </label>
+                    <label class="flex items-center text-sm font-medium text-gray-700 cursor-pointer">
+                        <input type="radio" name="payment_method" value="check" class="mr-2" onchange="toggleCheckInputs()">
+                        Issue Check
+                    </label>
+                </div>
+
+                <div id="checkInputs" class="hidden grid grid-cols-2 gap-3 mt-2">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Check Number</label>
+                        <input type="text" name="check_number" id="inputCheckNum" class="w-full border p-2 rounded text-sm font-mono" placeholder="e.g. 000123">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Payee Name</label>
+                        <input type="text" name="payee_name" id="inputPayee" class="w-full border p-2 rounded text-sm" placeholder="Name on check">
+                    </div>
+                </div>
+            </div>
+
             <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Category (Chart of Accounts)</label>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Category</label>
                 <select name="category_id" class="w-full border p-2 rounded text-sm bg-white" required>
                     <option value="">Select Category...</option>
                     <?php foreach($categories as $cat): ?>
@@ -226,7 +250,7 @@
 
             <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
-                <input type="text" name="description" class="w-full border p-2 rounded text-sm" placeholder="Payee Name / Purpose" required>
+                <input type="text" name="description" class="w-full border p-2 rounded text-sm" placeholder="Purpose of expense" required>
             </div>
 
             <div id="calculatorContainer" class="p-4 bg-gray-50 border border-gray-200 rounded-md">
@@ -242,8 +266,8 @@
 
                 <div id="actualSection" class="mt-3">
                     <label class="block text-xs font-bold text-gray-500 uppercase">Actual Expense Cost</label>
-                    <input type="number" step="0.01" name="actual_amount" id="actualAmount" oninput="calculateChange()" class="w-full border-gray-300 rounded shadow-sm border p-2 text-lg font-bold" placeholder="0.00">
-                </div>
+                    <input type="number" step="0.01" name="amount" id="actualAmount" oninput="calculateChange()" class="w-full border-gray-300 rounded shadow-sm border p-2 text-lg font-bold" placeholder="0.00">
+                    </div>
                 
                 <div class="text-right mt-2 text-sm font-bold text-green-600" id="changeDisplay"></div>
             </div>
@@ -332,18 +356,18 @@ const allAccounts = <?php echo json_encode($allFinancialAccounts); ?>;
 
 function openModal() {
     document.getElementById('expenseModal').classList.remove('hidden');
-    filterAccounts(); // Initialize dropdown
+    updateFormUI(); // Initialize dropdowns
 }
 
-function filterAccounts() {
+function updateFormUI() {
     const type = document.getElementById('payFromType').value; // 'cash' or 'bank'
     const select = document.getElementById('sourceAccountSelect');
     const calc = document.getElementById('calculatorContainer');
+    const bankOpts = document.getElementById('bankOptions');
 
     // 1. Filter Dropdown Options
     select.innerHTML = "";
     const filtered = allAccounts.filter(acc => acc.type === type);
-    
     filtered.forEach(acc => {
         const option = document.createElement("option");
         option.value = acc.id;
@@ -351,13 +375,43 @@ function filterAccounts() {
         select.appendChild(option);
     });
 
-    // 2. Hide "Change Calculator" if Bank is selected
+    // 2. Toggle Sections based on Type
     if (type === 'bank') {
+        // Show Bank Options (Check/Transfer), Hide Cash Calculator
         calc.style.display = 'none';
+        bankOpts.classList.remove('hidden');
+        
+        // Reset Cash fields to prevent submission errors
         document.getElementById('toggleChange').checked = false;
         document.getElementById('tenderedAmount').value = '';
     } else {
+        // Show Cash Calculator, Hide Bank Options
         calc.style.display = 'block';
+        bankOpts.classList.add('hidden');
+        
+        // Reset Check fields
+        toggleCheckInputs(); // Ensure inputs are hidden/not required
+    }
+}
+
+function toggleCheckInputs() {
+    const method = document.querySelector('input[name="payment_method"]:checked')?.value;
+    const inputs = document.getElementById('checkInputs');
+    const checkNum = document.getElementById('inputCheckNum');
+    const payee = document.getElementById('inputPayee');
+    const payFromType = document.getElementById('payFromType').value;
+
+    // Only show if Pay Type is Bank AND Method is Check
+    if (payFromType === 'bank' && method === 'check') {
+        inputs.classList.remove('hidden');
+        checkNum.required = true;
+        payee.required = true;
+    } else {
+        inputs.classList.add('hidden');
+        checkNum.required = false;
+        payee.required = false;
+        checkNum.value = '';
+        payee.value = '';
     }
 }
 
