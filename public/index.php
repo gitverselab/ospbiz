@@ -91,6 +91,12 @@ elseif ($uri === '/bank/transfers/create') {
 elseif ($uri === '/bank/transfers/store') {
     $c = new FundTransferController(); $c->store();
 }
+elseif ($uri === '/bank/transfers/approve') {
+    $c = new FundTransferController(); $c->approve();
+}
+elseif ($uri === '/bank/transfers/delete') {
+    $c = new FundTransferController(); $c->delete();
+}
 // --- EXPENSES: PURCHASES ---
 elseif ($uri === '/expenses/purchases') {
     $c = new PurchaseController(); $c->index();

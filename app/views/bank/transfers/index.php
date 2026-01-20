@@ -116,13 +116,13 @@
                     <td class="px-6 py-4 text-center">
                         <?php if ($t['status'] === 'pending'): ?>
                             <div class="flex justify-center gap-2">
-                                <form action="/fund_transfers/approve" method="POST" onsubmit="return confirm('Confirm this transfer? Balances will be updated.');">
+                                <form action="/bank/transfers/approve" method="POST" onsubmit="return confirm('Confirm this transfer? Balances will be updated.');">
                                     <input type="hidden" name="id" value="<?= $t['id'] ?>">
                                     <button type="submit" class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 shadow flex items-center">
                                         <i class="fa-solid fa-check mr-1"></i> Approve
                                     </button>
                                 </form>
-                                <form action="/fund_transfers/delete" method="POST" onsubmit="return confirm('Cancel this request?');">
+                                <form action="/bank/transfers/delete" method="POST" onsubmit="return confirm('Cancel this request?');">
                                     <input type="hidden" name="id" value="<?= $t['id'] ?>">
                                     <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-bold px-2 py-1">
                                         <i class="fa-solid fa-trash"></i>
