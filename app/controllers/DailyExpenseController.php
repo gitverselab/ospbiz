@@ -1,7 +1,4 @@
-<?php
-class DailyExpenseController {
-
-    public function index() {
+public function index() {
         $db = Database::getInstance();
         
         // --- 1. GET PARAMETERS ---
@@ -16,7 +13,8 @@ class DailyExpenseController {
         $offset = ($page - 1) * $limit;
 
         // --- 2. BUILD QUERY ---
-        $whereSql = "t.type = 'credit'"; // Expenses are credits (money out)
+        // FIX: Only show credits from CASH accounts (This hides Bank Checks)
+        $whereSql = "t.type = 'credit' AND fa.type = 'cash'"; 
         $params = [];
 
         // Apply Filters
@@ -37,8 +35,14 @@ class DailyExpenseController {
             $params[] = $categoryId;
         }
 
-        // --- 3. COUNT ---
-        $stmtCount = $db->prepare("SELECT COUNT(*) as total FROM account_transactions t WHERE $whereSql");
+        // --- 3. COUNT (FIXED) ---
+        // We added the JOIN here so the database knows what 'fa.type' is
+        $countSql = "SELECT COUNT(*) as total 
+                     FROM account_transactions t 
+                     JOIN financial_accounts fa ON t.financial_account_id = fa.id 
+                     WHERE $whereSql";
+        
+        $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
         $totalRecords = $stmtCount->fetch()['total'];
         $totalPages = ceil($totalRecords / $limit);
@@ -58,7 +62,6 @@ class DailyExpenseController {
 
         // --- 5. DROPDOWNS ---
         $allFinancialAccounts = $db->query("SELECT * FROM financial_accounts ORDER BY type, name")->fetchAll();
-        // Fetch Expense/Asset/Liability accounts for the dropdown
         $categories = $db->query("SELECT * FROM accounts WHERE type IN ('expense', 'asset', 'liability', 'cost of goods sold') ORDER BY code ASC")->fetchAll();
 
         $filters = [
@@ -67,7 +70,7 @@ class DailyExpenseController {
         ];
 
         $pageTitle = "Daily Expenses";
-        $childView = ROOT_PATH . '/app/views/expenses/daily/index.php'; // Verify this path matches your folder structure
+        $childView = ROOT_PATH . '/app/views/expenses/daily/index.php';
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
 
