@@ -38,13 +38,8 @@ public function index() {
             $params[] = $categoryId;
         }
 
-        // --- 3. COUNT (FIXED) ---
-        // We added the JOIN here so the database knows what 'fa.type' is
-        $countSql = "SELECT COUNT(*) as total 
-                     FROM account_transactions t 
-                     JOIN financial_accounts fa ON t.financial_account_id = fa.id 
-                     WHERE $whereSql";
-        
+// --- 3. COUNT ---
+        $countSql = "SELECT COUNT(*) as total FROM account_transactions t JOIN financial_accounts fa ON t.financial_account_id = fa.id WHERE $whereSql";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
         $totalRecords = $stmtCount->fetch()['total'];
@@ -63,21 +58,16 @@ public function index() {
         $stmt->execute($params);
         $expenses = $stmt->fetchAll();
 
-        // --- 5. DROPDOWNS ---
         $allFinancialAccounts = $db->query("SELECT * FROM financial_accounts ORDER BY type, name")->fetchAll();
         $categories = $db->query("SELECT * FROM accounts WHERE type IN ('expense', 'asset', 'liability', 'cost of goods sold') ORDER BY code ASC")->fetchAll();
 
-        $filters = [
-            'search' => $search, 'from' => $fromDate, 'to' => $toDate, 'category' => $categoryId,
-            'limit' => $limit, 'page' => $page, 'total_pages' => $totalPages, 'total_records' => $totalRecords
-        ];
-
+        $filters = compact('search', 'fromDate', 'toDate', 'categoryId', 'limit', 'page', 'totalPages', 'totalRecords');
         $pageTitle = "Daily Expenses";
         $childView = ROOT_PATH . '/app/views/expenses/daily/index.php';
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
 
-// --- CREATE EXPENSE (Updated for Real-time Balance) ---
+    // --- CREATE EXPENSE (Fixed for Real-time Balance) ---
     public function store() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
@@ -92,33 +82,28 @@ public function index() {
                 $isPending = isset($_POST['is_pending_change']) ? 1 : 0;
                 $tendered = floatval($_POST['tendered_amount']);
                 $amount = floatval($_POST['amount']); 
-                $finalAmount = ($isPending) ? $tendered : $amount;
+                
+                // Final expense amount
+                $finalAmount = ($isPending && $tendered > 0) ? $tendered : $amount;
 
                 $payType = $_POST['payment_source_type'] ?? 'cash';
                 $payMethod = $_POST['payment_method'] ?? '';
-                
-                // --- SCENARIO A: PAYING BY CHECK ---
-                if ($payType === 'bank' && $payMethod === 'check') {
+                $isCheck = ($payType === 'bank' && $payMethod === 'check');
+
+                // 1. HANDLE CHECK CREATION
+                if ($isCheck) {
                     $checkNum = $_POST['check_number'];
                     $payee = $_POST['payee_name'];
 
-                    // 1. Insert into Checks Table (Pending Liability)
+                    // Create Check (Issued)
                     $chkSql = "INSERT INTO checks (company_id, financial_account_id, check_number, payee_name, date, amount, memo, status, source_type) 
                                VALUES (1, ?, ?, ?, ?, ?, ?, 'issued', 'expense')";
                     $db->prepare($chkSql)->execute([$accId, $checkNum, $payee, $date, $finalAmount, $desc]);
 
-                    // STOP HERE! Do not deduct balance. Do not add to Transaction Ledger yet.
-                    // The user will see this in "Check Registry" as Issued.
-                    // When they click "Clear" in Registry, THAT is when we deduct.
-                    
-                    $db->commit();
-                    header("Location: /expenses/daily");
-                    exit; 
+                    $desc .= " (Check #$checkNum)";
                 }
 
-                // --- SCENARIO B: CASH OR ONLINE TRANSFER (Immediate Deduction) ---
-                
-                // 1. Save Transaction Log
+                // 2. RECORD EXPENSE (So it appears in the list)
                 $sql = "INSERT INTO account_transactions 
                         (financial_account_id, date, type, amount, description, contra_account_id, is_pending_change, tendered_amount) 
                         VALUES (?, ?, 'credit', ?, ?, ?, ?, ?)";
@@ -126,21 +111,37 @@ public function index() {
                 $stmt->execute([$accId, $date, $finalAmount, $desc, $catId, $isPending, $tendered]);
                 $transId = $db->lastInsertId();
 
-                // 2. Deduct Balance Immediately
-                $update = $db->prepare("UPDATE financial_accounts SET current_balance = current_balance - ? WHERE id = ?");
-                $update->execute([$finalAmount, $accId]);
+                // 3. BALANCE DEDUCTION (The "Real-time" Logic)
+                if (!$isCheck) {
+                    // Only deduct IMMEDIATELY if it is Cash or Online Transfer
+                    $update = $db->prepare("UPDATE financial_accounts SET current_balance = current_balance - ? WHERE id = ?");
+                    $update->execute([$finalAmount, $accId]);
+                }
+                // Note: If it IS a check, we do NOT deduct. It will deduct when you click "Clear" in Check Registry.
 
-                // 3. Journal Entry
-                // ... (Keep existing Journal Logic) ...
-                $sourceInfo = $db->query("SELECT account_id FROM financial_accounts WHERE id = $accId")->fetch();
-                $sourceGLId = $sourceInfo['account_id'];
+                // 4. JOURNAL ENTRY
+                // If it's a check, we Credit "Accounts Payable" (Liability) instead of Bank.
+                // If it's cash/transfer, we Credit the Asset Account directly.
                 
-                if ($sourceGLId && $catId && file_exists(ROOT_PATH . '/app/controllers/JournalController.php')) {
+                $creditAccountId = 0;
+                if ($isCheck) {
+                    // Find 'Accounts Payable' or similar Liability account
+                    $ap = $db->query("SELECT id FROM accounts WHERE type = 'Liability' LIMIT 1")->fetch();
+                    $creditAccountId = $ap ? $ap['id'] : 0;
+                } else {
+                    // Find the Bank/Cash GL Account
+                    $sourceInfo = $db->query("SELECT account_id FROM financial_accounts WHERE id = $accId")->fetch();
+                    $creditAccountId = $sourceInfo['account_id'];
+                }
+
+                if ($creditAccountId && $catId && file_exists(ROOT_PATH . '/app/controllers/JournalController.php')) {
                     require_once ROOT_PATH . '/app/controllers/JournalController.php';
+
                     $lines = [
                         ['account_id' => $catId, 'desc' => $desc, 'debit' => $finalAmount, 'credit' => 0],
-                        ['account_id' => $sourceGLId, 'desc' => $desc, 'debit' => 0, 'credit' => $finalAmount]
+                        ['account_id' => $creditAccountId, 'desc' => $desc, 'debit' => 0, 'credit' => $finalAmount]
                     ];
+
                     JournalController::post($date, 'EXP-'.$transId, $desc, 'daily_expense', $transId, $lines);
                 }
 
