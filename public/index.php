@@ -119,7 +119,7 @@ elseif ($uri === '/expenses/payments/store') {
 elseif ($uri === '/expenses/daily') {
     $c = new DailyExpenseController(); $c->index();
 }
-elseif ($uri === '/expenses/daily/create') {
+elseif ($uri === '/expenses/daily/store') {
     $c = new DailyExpenseController(); $c->store();
 }
 elseif ($uri === '/expenses/daily/settle') {
