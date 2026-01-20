@@ -14,7 +14,7 @@ class DailyExpenseController {
         $offset = ($page - 1) * $limit;
 
         // --- 2. BUILD QUERY ---
-        $whereSql = "t.type = 'credit'"; 
+        $whereSql = "t.type = 'credit' AND t.description NOT LIKE 'Transfer Out%'"; 
         $params = [];
 
         if ($search) {
