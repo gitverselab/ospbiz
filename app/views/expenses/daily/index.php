@@ -166,7 +166,8 @@
 
             <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Source Account</label>
-                <select name="financial_account_id" id="sourceAccountSelect" class="w-full border p-2 rounded text-sm bg-white" required></select>
+                <select name="financial_account_id" id="sourceAccountSelect" class="w-full border p-2 rounded text-sm bg-white" required>
+                    </select>
             </div>
 
             <div id="bankOptions" class="hidden bg-blue-50 p-3 rounded border border-blue-100 space-y-3">
@@ -197,7 +198,9 @@
                 <select name="category_id" class="w-full border p-2 rounded text-sm bg-white" required>
                     <option value="">Select Category...</option>
                     <?php foreach($categories as $cat): ?>
-                        <option value="<?php echo $cat['id']; ?>"><?php echo $cat['code'] . ' - ' . $cat['name']; ?></option>
+                        <option value="<?php echo $cat['id']; ?>">
+                            <?php echo $cat['code'] . ' - ' . $cat['name']; ?>
+                        </option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -223,6 +226,7 @@
                     <input type="number" step="0.01" name="tendered_amount" id="tenderedAmount" oninput="calculateChange()" class="w-full border p-2 rounded text-sm" placeholder="0.00">
                     <p class="text-[10px] text-gray-500 mt-1">We will record the tendered amount as the expense for now.</p>
                 </div>
+                
                 <div class="text-right mt-2 text-sm font-bold text-green-600" id="changeDisplay"></div>
             </div>
 
