@@ -16,8 +16,7 @@ class DailyExpenseController {
         $offset = ($page - 1) * $limit;
 
         // --- 2. BUILD QUERY ---
-        // FIX: Only show credits from CASH accounts (ignore Bank/Checks)
-        $whereSql = "t.type = 'credit' AND fa.type = 'cash'";
+        $whereSql = "t.type = 'credit'"; // Expenses are credits (money out)
         $params = [];
 
         // Apply Filters
@@ -38,14 +37,8 @@ class DailyExpenseController {
             $params[] = $categoryId;
         }
 
-// --- 3. COUNT (FIXED) ---
-        // We added the JOIN here so 'fa.type' works
-        $countSql = "SELECT COUNT(*) as total 
-                     FROM account_transactions t 
-                     JOIN financial_accounts fa ON t.financial_account_id = fa.id 
-                     WHERE $whereSql";
-        
-        $stmtCount = $db->prepare($countSql);
+        // --- 3. COUNT ---
+        $stmtCount = $db->prepare("SELECT COUNT(*) as total FROM account_transactions t WHERE $whereSql");
         $stmtCount->execute($params);
         $totalRecords = $stmtCount->fetch()['total'];
         $totalPages = ceil($totalRecords / $limit);
