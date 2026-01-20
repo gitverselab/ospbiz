@@ -1,7 +1,7 @@
 <?php
 class DailyExpenseController {
 
-public function index() {
+    public function index() {
         $db = Database::getInstance();
         
         // --- 1. GET PARAMETERS ---
@@ -10,35 +10,24 @@ public function index() {
         $toDate = $_GET['to'] ?? '';
         $categoryId = $_GET['category'] ?? '';
         
-        // Pagination
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
         $offset = ($page - 1) * $limit;
 
         // --- 2. BUILD QUERY ---
-        // FIX: Only show credits from CASH accounts (This hides Bank Checks)
-        $whereSql = "t.type = 'credit' AND fa.type = 'cash'"; 
+        // FIX: Removed "AND fa.type='cash'" so you can see Bank/Check expenses too!
+        $whereSql = "t.type = 'credit'"; 
         $params = [];
 
-        // Apply Filters
         if ($search) {
             $whereSql .= " AND (t.description LIKE ? OR t.reference_no LIKE ?)";
             $params[] = "%$search%"; $params[] = "%$search%";
         }
-        if ($fromDate) {
-            $whereSql .= " AND t.date >= ?";
-            $params[] = $fromDate;
-        }
-        if ($toDate) {
-            $whereSql .= " AND t.date <= ?";
-            $params[] = $toDate;
-        }
-        if ($categoryId) {
-            $whereSql .= " AND t.contra_account_id = ?";
-            $params[] = $categoryId;
-        }
+        if ($fromDate) { $whereSql .= " AND t.date >= ?"; $params[] = $fromDate; }
+        if ($toDate) { $whereSql .= " AND t.date <= ?"; $params[] = $toDate; }
+        if ($categoryId) { $whereSql .= " AND t.contra_account_id = ?"; $params[] = $categoryId; }
 
-// --- 3. COUNT ---
+        // --- 3. COUNT ---
         $countSql = "SELECT COUNT(*) as total FROM account_transactions t JOIN financial_accounts fa ON t.financial_account_id = fa.id WHERE $whereSql";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
