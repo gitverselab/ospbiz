@@ -196,7 +196,6 @@
                     <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
                     <input type="date" name="date" value="<?php echo date('Y-m-d'); ?>" class="w-full border p-2 rounded text-sm">
                 </div>
-                
                 <div>
                     <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Pay From</label>
                     <select id="payFromType" name="payment_source_type" class="w-full border p-2 rounded text-sm bg-white" onchange="updateFormUI()">
@@ -223,7 +222,6 @@
                         Issue Check
                     </label>
                 </div>
-
                 <div id="checkInputs" class="hidden grid grid-cols-2 gap-3 mt-2">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Check Number</label>
@@ -253,28 +251,29 @@
                 <input type="text" name="description" class="w-full border p-2 rounded text-sm" placeholder="Purpose of expense" required>
             </div>
 
-            <div id="calculatorContainer" class="p-4 bg-gray-50 border border-gray-200 rounded-md">
-                <div class="flex items-center mb-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Amount</label>
+                <input type="number" step="0.01" name="amount" id="mainAmount" class="w-full border-gray-300 rounded shadow-sm border p-2 text-xl font-bold" placeholder="0.00" required>
+            </div>
+
+            <div id="calculatorContainer" class="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-md">
+                <div class="flex items-center mb-2">
                     <input type="checkbox" name="is_pending_change" id="toggleChange" value="1" class="mr-2 h-4 w-4 text-blue-600 cursor-pointer" onchange="toggleCalculator()">
-                    <label for="toggleChange" class="text-sm font-bold text-gray-700 cursor-pointer select-none">Change will be given later?</label>
+                    <label for="toggleChange" class="text-xs font-bold text-gray-700 cursor-pointer select-none uppercase">Calculate Change (Tendered vs Actual)</label>
                 </div>
                 
-                <div>
+                <div id="tenderedSection" class="hidden mt-2">
                     <label class="block text-xs font-bold text-gray-500 uppercase">Amount Given / Tendered</label>
-                    <input type="number" step="0.01" name="tendered_amount" id="tenderedAmount" oninput="calculateChange()" class="w-full border-gray-300 rounded shadow-sm border p-2 text-lg font-bold" placeholder="0.00">
+                    <input type="number" step="0.01" name="tendered_amount" id="tenderedAmount" oninput="calculateChange()" class="w-full border p-2 rounded text-sm" placeholder="0.00">
+                    <p class="text-[10px] text-gray-500 mt-1">We will record the tendered amount as the expense for now.</p>
                 </div>
-
-                <div id="actualSection" class="mt-3">
-                    <label class="block text-xs font-bold text-gray-500 uppercase">Actual Expense Cost</label>
-                    <input type="number" step="0.01" name="amount" id="actualAmount" oninput="calculateChange()" class="w-full border-gray-300 rounded shadow-sm border p-2 text-lg font-bold" placeholder="0.00">
-                    </div>
                 
                 <div class="text-right mt-2 text-sm font-bold text-green-600" id="changeDisplay"></div>
             </div>
 
-            <div class="pt-2 flex justify-end gap-3">
+            <div class="pt-4 flex justify-end gap-3">
                 <button type="button" onclick="document.getElementById('expenseModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
-                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Save</button>
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Save Expense</button>
             </div>
         </form>
     </div>
@@ -360,12 +359,12 @@ function openModal() {
 }
 
 function updateFormUI() {
-    const type = document.getElementById('payFromType').value; // 'cash' or 'bank'
+    const type = document.getElementById('payFromType').value;
     const select = document.getElementById('sourceAccountSelect');
     const calc = document.getElementById('calculatorContainer');
     const bankOpts = document.getElementById('bankOptions');
 
-    // 1. Filter Dropdown Options
+    // Filter Dropdown
     select.innerHTML = "";
     const filtered = allAccounts.filter(acc => acc.type === type);
     filtered.forEach(acc => {
@@ -375,22 +374,14 @@ function updateFormUI() {
         select.appendChild(option);
     });
 
-    // 2. Toggle Sections based on Type
     if (type === 'bank') {
-        // Show Bank Options (Check/Transfer), Hide Cash Calculator
-        calc.style.display = 'none';
-        bankOpts.classList.remove('hidden');
-        
-        // Reset Cash fields to prevent submission errors
-        document.getElementById('toggleChange').checked = false;
-        document.getElementById('tenderedAmount').value = '';
+        calc.style.display = 'none'; // Hide Calculator
+        bankOpts.classList.remove('hidden'); // Show Check Options
+        document.getElementById('toggleChange').checked = false; // Reset checkbox
     } else {
-        // Show Cash Calculator, Hide Bank Options
-        calc.style.display = 'block';
-        bankOpts.classList.add('hidden');
-        
-        // Reset Check fields
-        toggleCheckInputs(); // Ensure inputs are hidden/not required
+        calc.style.display = 'block'; // Show Calculator
+        bankOpts.classList.add('hidden'); // Hide Check Options
+        toggleCheckInputs();
     }
 }
 
@@ -417,23 +408,21 @@ function toggleCheckInputs() {
 
 function toggleCalculator() {
     const isChecked = document.getElementById('toggleChange').checked;
-    const actualSection = document.getElementById('actualSection');
+    const tenderedSec = document.getElementById('tenderedSection');
     
     if (isChecked) {
-        actualSection.classList.add('hidden'); 
-        document.getElementById('actualAmount').value = 0;
+        tenderedSec.classList.remove('hidden');
     } else {
-        actualSection.classList.remove('hidden');
+        tenderedSec.classList.add('hidden');
+        document.getElementById('tenderedAmount').value = '';
     }
-    calculateChange();
 }
 
 function calculateChange() {
     const tendered = parseFloat(document.getElementById('tenderedAmount').value) || 0;
-    const actual = parseFloat(document.getElementById('actualAmount').value) || 0;
-    const isChecked = document.getElementById('toggleChange').checked;
+    const actual = parseFloat(document.getElementById('mainAmount').value) || 0;
     
-    if (!isChecked && tendered > 0) {
+    if (tendered > 0) {
         let change = tendered - actual;
         document.getElementById('changeDisplay').innerText = "Change: ₱" + change.toLocaleString('en-US', {minimumFractionDigits: 2});
     } else {
