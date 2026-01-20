@@ -4,7 +4,7 @@
         <a href="/bank/transfers" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
     </div>
 
-    <form action="/fund_transfers/store" method="POST" class="space-y-6">
+    <form action="/bank/transfers/store" method="POST" class="space-y-6">
         
         <div class="bg-blue-50 p-4 rounded border border-blue-100">
             <label class="block text-sm font-bold text-blue-800 uppercase mb-2">1. Select Transfer Method</label>
