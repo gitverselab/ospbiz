@@ -64,42 +64,63 @@
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
-            <?php if(empty($expenses)): ?>
-                <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 italic">No expenses found matching your criteria.</td></tr>
-            <?php else: ?>
-                <?php foreach ($expenses as $e): ?>
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm text-gray-900"><?php echo $e['date']; ?></td>
-                    <td class="px-6 py-4 text-sm font-medium text-gray-900">
+            <?php foreach ($expenses as $e): ?>
+                
+                <?php 
+                    $rowClass = "hover:bg-gray-50";
+                    if ($e['is_voided']) $rowClass = "bg-gray-100 text-gray-400 line-through"; 
+                    elseif (empty($e['verified_at'])) $rowClass = "bg-yellow-50"; // Needs Approval
+                ?>
+
+                <tr class="<?= $rowClass ?>">
+                    <td class="px-6 py-4 text-sm"><?php echo $e['date']; ?></td>
+                    <td class="px-6 py-4 text-sm font-medium">
                         <?php echo htmlspecialchars($e['description']); ?>
-                        <div class="text-xs text-gray-400"><?php echo htmlspecialchars($e['source_account']); ?></div>
+                        <div class="text-xs opacity-75"><?php echo htmlspecialchars($e['source_account']); ?></div>
+                        
+                        <?php if($e['is_voided']): ?>
+                            <span class="text-red-500 font-bold text-xs">VOIDED</span>
+                        <?php endif; ?>
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-500"><?php echo htmlspecialchars($e['category_name'] ?? '-'); ?></td>
+                    <td class="px-6 py-4 text-sm opacity-75"><?php echo htmlspecialchars($e['category_name'] ?? '-'); ?></td>
                     
                     <td class="px-6 py-4 text-center">
-                        <?php if ($e['is_pending_change']): ?>
-                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded-full animate-pulse">Pending Change</span>
+                        <?php if ($e['is_voided']): ?>
+                            <span class="px-2 py-1 bg-gray-200 text-gray-500 text-xs font-bold rounded-full">Voided</span>
+                        <?php elseif (empty($e['verified_at'])): ?>
+                            <span class="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-bold rounded-full animate-pulse">To Verify</span>
                         <?php else: ?>
-                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">Paid</span>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full"><i class="fa-solid fa-check"></i> Verified</span>
                         <?php endif; ?>
                     </td>
 
-                    <td class="px-6 py-4 text-right font-bold text-gray-800">
+                    <td class="px-6 py-4 text-right font-bold">
                         ₱<?php echo number_format($e['amount'], 2); ?>
                     </td>
                     
-                    <td class="px-6 py-4 text-center text-sm">
-                        <?php if ($e['is_pending_change']): ?>
-                            <button onclick='openSettleModal(<?php echo json_encode($e); ?>)' class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 shadow-sm">
-                                Settle Change
+                    <td class="px-6 py-4 text-center text-sm flex justify-center gap-2">
+                        
+                        <?php if (!$e['is_voided']): ?>
+                            
+                            <?php if (empty($e['verified_at'])): ?>
+                                <form action="/expenses/daily/verify" method="POST" title="Approve this transaction">
+                                    <input type="hidden" name="id" value="<?= $e['id'] ?>">
+                                    <button type="submit" class="text-green-600 hover:text-green-800 border border-green-200 bg-white px-2 py-1 rounded shadow-sm">
+                                        <i class="fa-solid fa-check"></i> Verify
+                                    </button>
+                                </form>
+                            <?php endif; ?>
+
+                            <button onclick='openVoidModal(<?= json_encode($e) ?>)' class="text-red-400 hover:text-red-600 px-2 py-1">
+                                <i class="fa-solid fa-ban"></i> Void
                             </button>
+
                         <?php else: ?>
-                            <span class="text-gray-400 text-xs">Completed</span>
+                            <span class="text-xs italic">No Actions</span>
                         <?php endif; ?>
                     </td>
                 </tr>
-                <?php endforeach; ?>
-            <?php endif; ?>
+            <?php endforeach; ?>
         </tbody>
     </table>
 </div>
@@ -242,7 +263,45 @@
         </form>
     </div>
 </div>
+<div id="voidModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-sm">
+        <div class="px-6 py-4 border-b border-red-100 bg-red-50 rounded-t-lg">
+            <h3 class="font-bold text-lg text-red-800">Void Transaction</h3>
+        </div>
+        
+        <form action="/expenses/daily/void" method="POST" class="p-6 space-y-4">
+            <input type="hidden" name="id" id="voidId">
+            
+            <p class="text-sm text-gray-600">
+                Are you sure you want to void the expense for 
+                <span class="font-bold text-gray-800" id="voidDesc"></span>?
+            </p>
+            
+            <div class="bg-yellow-50 border border-yellow-200 p-3 rounded text-xs text-yellow-800">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                This will reverse the Journal Entry and restore the cash balance.
+            </div>
 
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Reason for Voiding</label>
+                <input type="text" name="void_reason" class="w-full border p-2 rounded text-sm" placeholder="e.g. Wrong amount encoded" required>
+            </div>
+
+            <div class="pt-2 flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('voidModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
+                <button type="submit" class="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold">Confirm Void</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openVoidModal(data) {
+    document.getElementById('voidModal').classList.remove('hidden');
+    document.getElementById('voidId').value = data.id;
+    document.getElementById('voidDesc').innerText = data.description + " (₱" + data.amount + ")";
+}
+</script>
 <script>
 // Pass PHP data to JS
 const allAccounts = <?php echo json_encode($allFinancialAccounts); ?>;

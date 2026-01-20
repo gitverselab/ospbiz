@@ -224,4 +224,95 @@ class DailyExpenseController {
             }
         }
     }
+
+    // --- VERIFY (APPROVE) TRANSACTION ---
+    public function verify() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $db = Database::getInstance();
+            $id = $_POST['id'];
+            
+            // Mark as Verified (Approved)
+            $db->prepare("UPDATE account_transactions SET verified_at = NOW() WHERE id = ?")
+               ->execute([$id]);
+            
+            header("Location: /expenses/daily");
+        }
+    }
+
+    // --- VOID (REVERSE) TRANSACTION ---
+    public function void() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $db = Database::getInstance();
+            try {
+                $db->beginTransaction();
+
+                $id = $_POST['id'];
+                $reason = $_POST['void_reason'];
+
+                // 1. Fetch Original Transaction
+                $stmt = $db->prepare("SELECT * FROM account_transactions WHERE id = ?");
+                $stmt->execute([$id]);
+                $original = $stmt->fetch();
+
+                if (!$original || $original['is_voided']) {
+                    throw new Exception("Transaction not found or already voided.");
+                }
+
+                // 2. Mark Original as Voided
+                $db->prepare("UPDATE account_transactions SET is_voided = 1 WHERE id = ?")->execute([$id]);
+
+                // 3. RESTORE BALANCE (Reverse the money movement)
+                // If original was Credit (Money Out), we Put Money In (Debit)
+                $restoreAmount = $original['amount'];
+                if ($original['type'] === 'credit') {
+                    $db->prepare("UPDATE financial_accounts SET current_balance = current_balance + ? WHERE id = ?")
+                       ->execute([$restoreAmount, $original['financial_account_id']]);
+                }
+
+                // 4. CREATE REVERSING JOURNAL ENTRY
+                // We need to swap the Debit and Credit accounts from the original entry.
+                // Original: Debit Expense (Cat), Credit Asset (Source)
+                // Void:     Debit Asset (Source), Credit Expense (Cat)
+                
+                $sourceInfo = $db->query("SELECT account_id FROM financial_accounts WHERE id = {$original['financial_account_id']}")->fetch();
+                $sourceGLId = $sourceInfo['account_id']; // Asset
+                $expenseGLId = $original['contra_account_id']; // Expense Category
+
+                if ($sourceGLId && $expenseGLId && file_exists(ROOT_PATH . '/app/controllers/JournalController.php')) {
+                    require_once ROOT_PATH . '/app/controllers/JournalController.php';
+
+                    $lines = [
+                        [
+                            'account_id' => $sourceGLId,   // DEBIT: Asset (Put money back)
+                            'desc' => "VOID: " . $original['description'],
+                            'debit' => $restoreAmount,
+                            'credit' => 0
+                        ],
+                        [
+                            'account_id' => $expenseGLId,  // CREDIT: Expense (Cancel expense)
+                            'desc' => "VOID: " . $original['description'],
+                            'debit' => 0,
+                            'credit' => $restoreAmount
+                        ]
+                    ];
+
+                    JournalController::post(
+                        date('Y-m-d'), 
+                        'VOID-'.$id, 
+                        "VOIDED: " . $original['description'] . " ($reason)", 
+                        'void_expense', 
+                        $id, 
+                        $lines
+                    );
+                }
+
+                $db->commit();
+                header("Location: /expenses/daily");
+
+            } catch (Exception $e) {
+                $db->rollBack();
+                die("Error voiding transaction: " . $e->getMessage());
+            }
+        }
+    }
 }

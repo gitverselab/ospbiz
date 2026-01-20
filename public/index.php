@@ -118,6 +118,12 @@ elseif ($uri === '/expenses/daily/create') {
 elseif ($uri === '/expenses/daily/settle') {
     $c = new DailyExpenseController(); $c->settle();
 }
+elseif ($uri === '/expenses/daily/verify') {
+    $c = new DailyExpenseController(); $c->verify();
+}
+elseif ($uri === '/expenses/daily/void') {
+    $c = new DailyExpenseController(); $c->void();
+}
 
 // --- BILLS & RECURRING ---
 elseif ($uri === '/expenses/bills') {
