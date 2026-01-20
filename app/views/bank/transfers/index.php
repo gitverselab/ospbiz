@@ -1,7 +1,7 @@
 <div class="flex justify-between items-center mb-6">
     <h2 class="text-2xl font-bold text-gray-800">Fund Transfers</h2>
     
-    <a href="/fund_transfers/create" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 font-medium">
+    <a href="/bank/transfers/create" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 font-medium">
         <i class="fa-solid fa-money-bill-transfer mr-2"></i> New Transfer
     </a>
 </div>
