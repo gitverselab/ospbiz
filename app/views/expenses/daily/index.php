@@ -76,7 +76,11 @@
                         <td class="px-6 py-4 text-sm"><?php echo $e['date']; ?></td>
                         <td class="px-6 py-4 text-sm font-medium">
                             <?php echo htmlspecialchars($e['description']); ?>
-                            <div class="text-xs opacity-75"><?php echo htmlspecialchars($e['source_account']); ?></div>
+                            
+                            <div class="text-xs opacity-75">
+                                <?php echo htmlspecialchars($e['source_account'] ?? 'Pending Check'); ?>
+                            </div>
+                            
                             <?php if($e['is_voided']): ?>
                                 <span class="text-red-500 font-bold text-xs no-underline ml-2">VOIDED</span>
                             <?php endif; ?>
