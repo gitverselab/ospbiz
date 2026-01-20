@@ -9,26 +9,28 @@
     <div class="flex flex-col md:flex-row gap-4 items-end">
         <div class="flex-1 w-full">
             <label class="text-xs font-bold text-gray-500 uppercase">Search</label>
-            <input type="text" name="search" value="<?php echo htmlspecialchars($filters['search']); ?>" placeholder="Description..." class="w-full border p-2 rounded text-sm">
+            <input type="text" name="search" value="<?php echo htmlspecialchars($filters['search'] ?? ''); ?>" placeholder="Description..." class="w-full border p-2 rounded text-sm">
         </div>
+
         <div class="w-full md:w-48">
             <label class="text-xs font-bold text-gray-500 uppercase">Category</label>
             <select name="category" class="w-full border p-2 rounded text-sm bg-white">
                 <option value="">All Categories</option>
                 <?php foreach($categories as $cat): ?>
-                    <option value="<?php echo $cat['id']; ?>" <?php echo ($filters['category'] == $cat['id']) ? 'selected' : ''; ?>>
+                    <option value="<?php echo $cat['id']; ?>" <?php echo (($filters['category'] ?? '') == $cat['id']) ? 'selected' : ''; ?>>
                         <?php echo htmlspecialchars($cat['name']); ?>
                     </option>
                 <?php endforeach; ?>
             </select>
         </div>
+
         <div class="w-full md:w-32">
             <label class="text-xs font-bold text-gray-500 uppercase">From</label>
-            <input type="date" name="from" value="<?php echo htmlspecialchars($filters['from']); ?>" class="w-full border p-2 rounded text-sm">
+            <input type="date" name="from" value="<?php echo htmlspecialchars($filters['from'] ?? ''); ?>" class="w-full border p-2 rounded text-sm">
         </div>
         <div class="w-full md:w-32">
             <label class="text-xs font-bold text-gray-500 uppercase">To</label>
-            <input type="date" name="to" value="<?php echo htmlspecialchars($filters['to']); ?>" class="w-full border p-2 rounded text-sm">
+            <input type="date" name="to" value="<?php echo htmlspecialchars($filters['to'] ?? ''); ?>" class="w-full border p-2 rounded text-sm">
         </div>
         <div class="w-full md:w-24">
             <label class="text-xs font-bold text-gray-500 uppercase">Show</label>

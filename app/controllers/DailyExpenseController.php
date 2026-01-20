@@ -4,6 +4,7 @@ class DailyExpenseController {
     public function index() {
         $db = Database::getInstance();
         
+        // --- 1. GET PARAMETERS ---
         $search = $_GET['search'] ?? '';
         $fromDate = $_GET['from'] ?? '';
         $toDate = $_GET['to'] ?? '';
@@ -14,7 +15,6 @@ class DailyExpenseController {
         $offset = ($page - 1) * $limit;
 
         // --- 2. BUILD QUERY ---
-        // FIX: Removed "AND fa.type = 'cash'" so Bank/Check expenses are visible
         $whereSql = "t.type = 'credit'"; 
         $params = [];
 
@@ -27,11 +27,7 @@ class DailyExpenseController {
         if ($categoryId) { $whereSql .= " AND t.contra_account_id = ?"; $params[] = $categoryId; }
 
         // --- 3. COUNT ---
-        $countSql = "SELECT COUNT(*) as total 
-                     FROM account_transactions t 
-                     JOIN financial_accounts fa ON t.financial_account_id = fa.id 
-                     WHERE $whereSql";
-        
+        $countSql = "SELECT COUNT(*) as total FROM account_transactions t JOIN financial_accounts fa ON t.financial_account_id = fa.id WHERE $whereSql";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
         $totalRecords = $stmtCount->fetch()['total'];
@@ -53,7 +49,17 @@ class DailyExpenseController {
         $allFinancialAccounts = $db->query("SELECT * FROM financial_accounts ORDER BY type, name")->fetchAll();
         $categories = $db->query("SELECT * FROM accounts WHERE type IN ('expense', 'asset', 'liability', 'cost of goods sold') ORDER BY code ASC")->fetchAll();
 
-        $filters = compact('search', 'fromDate', 'toDate', 'categoryId', 'limit', 'page', 'totalPages', 'totalRecords');
+        // FIX: Map keys correctly for the View ('total_pages' instead of 'totalPages')
+        $filters = [
+            'search' => $search,
+            'from' => $fromDate,           // View expects 'from'
+            'to' => $toDate,               // View expects 'to'
+            'category' => $categoryId,
+            'limit' => $limit,
+            'page' => $page,
+            'total_pages' => $totalPages,   // View expects 'total_pages'
+            'total_records' => $totalRecords // View expects 'total_records'
+        ];
 
         $pageTitle = "Daily Expenses";
         $childView = ROOT_PATH . '/app/views/expenses/daily/index.php';
