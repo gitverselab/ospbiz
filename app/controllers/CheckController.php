@@ -69,7 +69,7 @@ class CheckController {
     }
 
     // --- UPDATE STATUS (Clear / Void) ---
-    public function updateStatus() { // Can be accessed via /checks/status or /checks/updateStatus
+    public function Status() { // Can be accessed via /checks/status or /checks/updateStatus
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
             $id = $_POST['id'];
