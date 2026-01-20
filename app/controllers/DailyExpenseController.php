@@ -1,3 +1,6 @@
+<?php
+class DailyExpenseController {
+
 public function index() {
         $db = Database::getInstance();
         
