@@ -38,8 +38,14 @@ class DailyExpenseController {
             $params[] = $categoryId;
         }
 
-        // --- 3. COUNT ---
-        $stmtCount = $db->prepare("SELECT COUNT(*) as total FROM account_transactions t WHERE $whereSql");
+// --- 3. COUNT (FIXED) ---
+        // We added the JOIN here so 'fa.type' works
+        $countSql = "SELECT COUNT(*) as total 
+                     FROM account_transactions t 
+                     JOIN financial_accounts fa ON t.financial_account_id = fa.id 
+                     WHERE $whereSql";
+        
+        $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
         $totalRecords = $stmtCount->fetch()['total'];
         $totalPages = ceil($totalRecords / $limit);
