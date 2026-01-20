@@ -64,63 +64,87 @@
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
-            <?php foreach ($expenses as $e): ?>
-                
-                <?php 
-                    $rowClass = "hover:bg-gray-50";
-                    if ($e['is_voided']) $rowClass = "bg-gray-100 text-gray-400 line-through"; 
-                    elseif (empty($e['verified_at'])) $rowClass = "bg-yellow-50"; // Needs Approval
-                ?>
-
-                <tr class="<?= $rowClass ?>">
-                    <td class="px-6 py-4 text-sm"><?php echo $e['date']; ?></td>
-                    <td class="px-6 py-4 text-sm font-medium">
-                        <?php echo htmlspecialchars($e['description']); ?>
-                        <div class="text-xs opacity-75"><?php echo htmlspecialchars($e['source_account']); ?></div>
+            <?php if(empty($expenses)): ?>
+                <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 italic">No expenses found matching your criteria.</td></tr>
+            <?php else: ?>
+                <?php foreach ($expenses as $e): ?>
+                    <?php 
+                        // 1. Determine Row Style based on Status
+                        $rowClass = "hover:bg-gray-50"; // Default
                         
-                        <?php if($e['is_voided']): ?>
-                            <span class="text-red-500 font-bold text-xs">VOIDED</span>
-                        <?php endif; ?>
-                    </td>
-                    <td class="px-6 py-4 text-sm opacity-75"><?php echo htmlspecialchars($e['category_name'] ?? '-'); ?></td>
-                    
-                    <td class="px-6 py-4 text-center">
-                        <?php if ($e['is_voided']): ?>
-                            <span class="px-2 py-1 bg-gray-200 text-gray-500 text-xs font-bold rounded-full">Voided</span>
-                        <?php elseif (empty($e['verified_at'])): ?>
-                            <span class="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-bold rounded-full animate-pulse">To Verify</span>
-                        <?php else: ?>
-                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full"><i class="fa-solid fa-check"></i> Verified</span>
-                        <?php endif; ?>
-                    </td>
-
-                    <td class="px-6 py-4 text-right font-bold">
-                        ₱<?php echo number_format($e['amount'], 2); ?>
-                    </td>
-                    
-                    <td class="px-6 py-4 text-center text-sm flex justify-center gap-2">
+                        if ($e['is_voided']) {
+                            $rowClass = "bg-gray-100 text-gray-400 line-through"; // Voided style
+                        } elseif (empty($e['verified_at'])) {
+                            $rowClass = "bg-yellow-50"; // Needs Verification style
+                        }
+                    ?>
+                    <tr class="<?= $rowClass ?>">
                         
-                        <?php if (!$e['is_voided']): ?>
+                        <td class="px-6 py-4 text-sm"><?php echo $e['date']; ?></td>
+                        
+                        <td class="px-6 py-4 text-sm font-medium">
+                            <?php echo htmlspecialchars($e['description']); ?>
+                            <div class="text-xs opacity-75"><?php echo htmlspecialchars($e['source_account']); ?></div>
                             
-                            <?php if (empty($e['verified_at'])): ?>
-                                <form action="/expenses/daily/verify" method="POST" title="Approve this transaction">
-                                    <input type="hidden" name="id" value="<?= $e['id'] ?>">
-                                    <button type="submit" class="text-green-600 hover:text-green-800 border border-green-200 bg-white px-2 py-1 rounded shadow-sm">
-                                        <i class="fa-solid fa-check"></i> Verify
-                                    </button>
-                                </form>
+                            <?php if($e['is_voided']): ?>
+                                <span class="text-red-500 font-bold text-xs no-underline ml-2">VOIDED</span>
                             <?php endif; ?>
+                        </td>
 
-                            <button onclick='openVoidModal(<?= json_encode($e) ?>)' class="text-red-400 hover:text-red-600 px-2 py-1">
-                                <i class="fa-solid fa-ban"></i> Void
-                            </button>
+                        <td class="px-6 py-4 text-sm opacity-75"><?php echo htmlspecialchars($e['category_name'] ?? '-'); ?></td>
+                        
+                        <td class="px-6 py-4 text-center">
+                            <?php if ($e['is_voided']): ?>
+                                <span class="px-2 py-1 bg-gray-200 text-gray-500 text-xs font-bold rounded-full">Voided</span>
+                            <?php else: ?>
+                                <div class="flex flex-col gap-1 items-center">
+                                    <?php if (empty($e['verified_at'])): ?>
+                                        <span class="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-bold rounded-full animate-pulse">To Verify</span>
+                                    <?php endif; ?>
 
-                        <?php else: ?>
-                            <span class="text-xs italic">No Actions</span>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
+                                    <?php if ($e['is_pending_change']): ?>
+                                        <span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-bold rounded-full">Pending Change</span>
+                                    <?php elseif (!empty($e['verified_at'])): ?>
+                                        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">Verified Paid</span>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                        </td>
+
+                        <td class="px-6 py-4 text-right font-bold">
+                            ₱<?php echo number_format($e['amount'], 2); ?>
+                        </td>
+                        
+                        <td class="px-6 py-4 text-center text-sm">
+                            <?php if (!$e['is_voided']): ?>
+                                <div class="flex justify-center gap-2 items-center">
+                                    
+                                    <?php if (empty($e['verified_at'])): ?>
+                                        <form action="/expenses/daily/verify" method="POST" title="Approve this transaction">
+                                            <input type="hidden" name="id" value="<?= $e['id'] ?>">
+                                            <button type="submit" class="text-green-600 hover:text-green-800 bg-white border border-green-200 px-2 py-1 rounded shadow-sm">
+                                                <i class="fa-solid fa-check"></i>
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
+
+                                    <?php if ($e['is_pending_change']): ?>
+                                        <button onclick='openSettleModal(<?php echo json_encode($e); ?>)' class="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 shadow-sm whitespace-nowrap">
+                                            Settle
+                                        </button>
+                                    <?php endif; ?>
+
+                                    <button onclick='openVoidModal(<?= json_encode($e) ?>)' class="text-red-400 hover:text-red-600 px-2 py-1" title="Void Transaction">
+                                        <i class="fa-solid fa-ban"></i>
+                                    </button>
+                                </div>
+                            <?php else: ?>
+                                <span class="text-xs italic text-gray-400">No Actions</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </tbody>
     </table>
 </div>
