@@ -7,12 +7,10 @@
 
 <form method="GET" action="/expenses/daily" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
     <div class="flex flex-col md:flex-row gap-4 items-end">
-        
         <div class="flex-1 w-full">
             <label class="text-xs font-bold text-gray-500 uppercase">Search</label>
             <input type="text" name="search" value="<?php echo htmlspecialchars($filters['search']); ?>" placeholder="Description..." class="w-full border p-2 rounded text-sm">
         </div>
-
         <div class="w-full md:w-48">
             <label class="text-xs font-bold text-gray-500 uppercase">Category</label>
             <select name="category" class="w-full border p-2 rounded text-sm bg-white">
@@ -24,7 +22,6 @@
                 <?php endforeach; ?>
             </select>
         </div>
-
         <div class="w-full md:w-32">
             <label class="text-xs font-bold text-gray-500 uppercase">From</label>
             <input type="date" name="from" value="<?php echo htmlspecialchars($filters['from']); ?>" class="w-full border p-2 rounded text-sm">
@@ -33,17 +30,14 @@
             <label class="text-xs font-bold text-gray-500 uppercase">To</label>
             <input type="date" name="to" value="<?php echo htmlspecialchars($filters['to']); ?>" class="w-full border p-2 rounded text-sm">
         </div>
-
         <div class="w-full md:w-24">
             <label class="text-xs font-bold text-gray-500 uppercase">Show</label>
             <select name="limit" class="w-full border p-2 rounded text-sm bg-white">
                 <option value="10" <?php echo ($filters['limit'] == 10) ? 'selected' : ''; ?>>10</option>
                 <option value="25" <?php echo ($filters['limit'] == 25) ? 'selected' : ''; ?>>25</option>
                 <option value="50" <?php echo ($filters['limit'] == 50) ? 'selected' : ''; ?>>50</option>
-                <option value="100" <?php echo ($filters['limit'] == 100) ? 'selected' : ''; ?>>100</option>
             </select>
         </div>
-
         <div class="flex gap-2">
             <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700">Filter</button>
             <a href="/expenses/daily" class="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-medium hover:bg-gray-300 flex items-center">Reset</a>
@@ -69,30 +63,23 @@
             <?php else: ?>
                 <?php foreach ($expenses as $e): ?>
                     <?php 
-                        // 1. Determine Row Style based on Status
-                        $rowClass = "hover:bg-gray-50"; // Default
-                        
+                        $rowClass = "hover:bg-gray-50"; 
                         if ($e['is_voided']) {
-                            $rowClass = "bg-gray-100 text-gray-400 line-through"; // Voided style
+                            $rowClass = "bg-gray-100 text-gray-400 line-through"; 
                         } elseif (empty($e['verified_at'])) {
-                            $rowClass = "bg-yellow-50"; // Needs Verification style
+                            $rowClass = "bg-yellow-50"; 
                         }
                     ?>
                     <tr class="<?= $rowClass ?>">
-                        
                         <td class="px-6 py-4 text-sm"><?php echo $e['date']; ?></td>
-                        
                         <td class="px-6 py-4 text-sm font-medium">
                             <?php echo htmlspecialchars($e['description']); ?>
                             <div class="text-xs opacity-75"><?php echo htmlspecialchars($e['source_account']); ?></div>
-                            
                             <?php if($e['is_voided']): ?>
                                 <span class="text-red-500 font-bold text-xs no-underline ml-2">VOIDED</span>
                             <?php endif; ?>
                         </td>
-
                         <td class="px-6 py-4 text-sm opacity-75"><?php echo htmlspecialchars($e['category_name'] ?? '-'); ?></td>
-                        
                         <td class="px-6 py-4 text-center">
                             <?php if ($e['is_voided']): ?>
                                 <span class="px-2 py-1 bg-gray-200 text-gray-500 text-xs font-bold rounded-full">Voided</span>
@@ -101,7 +88,6 @@
                                     <?php if (empty($e['verified_at'])): ?>
                                         <span class="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-bold rounded-full animate-pulse">To Verify</span>
                                     <?php endif; ?>
-
                                     <?php if ($e['is_pending_change']): ?>
                                         <span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-bold rounded-full">Pending Change</span>
                                     <?php elseif (!empty($e['verified_at'])): ?>
@@ -110,33 +96,20 @@
                                 </div>
                             <?php endif; ?>
                         </td>
-
-                        <td class="px-6 py-4 text-right font-bold">
-                            ₱<?php echo number_format($e['amount'], 2); ?>
-                        </td>
-                        
+                        <td class="px-6 py-4 text-right font-bold">₱<?php echo number_format($e['amount'], 2); ?></td>
                         <td class="px-6 py-4 text-center text-sm">
                             <?php if (!$e['is_voided']): ?>
                                 <div class="flex justify-center gap-2 items-center">
-                                    
                                     <?php if (empty($e['verified_at'])): ?>
-                                        <form action="/expenses/daily/verify" method="POST" title="Approve this transaction">
+                                        <form action="/expenses/daily/verify" method="POST" title="Approve">
                                             <input type="hidden" name="id" value="<?= $e['id'] ?>">
-                                            <button type="submit" class="text-green-600 hover:text-green-800 bg-white border border-green-200 px-2 py-1 rounded shadow-sm">
-                                                <i class="fa-solid fa-check"></i>
-                                            </button>
+                                            <button type="submit" class="text-green-600 hover:text-green-800 bg-white border border-green-200 px-2 py-1 rounded shadow-sm"><i class="fa-solid fa-check"></i></button>
                                         </form>
                                     <?php endif; ?>
-
                                     <?php if ($e['is_pending_change']): ?>
-                                        <button onclick='openSettleModal(<?php echo json_encode($e); ?>)' class="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 shadow-sm whitespace-nowrap">
-                                            Settle
-                                        </button>
+                                        <button onclick='openSettleModal(<?php echo json_encode($e); ?>)' class="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 shadow-sm whitespace-nowrap">Settle</button>
                                     <?php endif; ?>
-
-                                    <button onclick='openVoidModal(<?= json_encode($e) ?>)' class="text-red-400 hover:text-red-600 px-2 py-1" title="Void Transaction">
-                                        <i class="fa-solid fa-ban"></i>
-                                    </button>
+                                    <button onclick='openVoidModal(<?= json_encode($e) ?>)' class="text-red-400 hover:text-red-600 px-2 py-1" title="Void"><i class="fa-solid fa-ban"></i></button>
                                 </div>
                             <?php else: ?>
                                 <span class="text-xs italic text-gray-400">No Actions</span>
@@ -150,31 +123,17 @@
 </div>
 
 <div class="flex justify-between items-center mt-4">
-    <div class="text-sm text-gray-500">
-        Showing Page <?php echo $filters['page']; ?> of <?php echo $filters['total_pages']; ?> 
-        (Total <?php echo $filters['total_records']; ?> records)
-    </div>
-    
+    <div class="text-sm text-gray-500">Showing Page <?php echo $filters['page']; ?> of <?php echo $filters['total_pages']; ?> (Total <?php echo $filters['total_records']; ?> records)</div>
     <div class="flex gap-2">
-        <?php 
-            // Build base URL keeping current filters
-            $params = $_GET; 
-            unset($params['page']); 
-            $baseUrl = '?' . http_build_query($params) . '&page=';
-        ?>
-
+        <?php $params = $_GET; unset($params['page']); $baseUrl = '?' . http_build_query($params) . '&page='; ?>
         <?php if ($filters['page'] > 1): ?>
             <a href="<?php echo $baseUrl . ($filters['page'] - 1); ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Previous</a>
         <?php else: ?>
             <span class="px-3 py-1 bg-gray-100 border rounded text-gray-400 text-sm cursor-not-allowed">Previous</span>
         <?php endif; ?>
-
         <?php for($i = 1; $i <= $filters['total_pages']; $i++): ?>
-            <a href="<?php echo $baseUrl . $i; ?>" class="px-3 py-1 border rounded text-sm <?php echo ($i == $filters['page']) ? 'bg-blue-600 text-white' : 'bg-white hover:bg-gray-50'; ?>">
-                <?php echo $i; ?>
-            </a>
+            <a href="<?php echo $baseUrl . $i; ?>" class="px-3 py-1 border rounded text-sm <?php echo ($i == $filters['page']) ? 'bg-blue-600 text-white' : 'bg-white hover:bg-gray-50'; ?>"><?php echo $i; ?></a>
         <?php endfor; ?>
-
         <?php if ($filters['page'] < $filters['total_pages']): ?>
             <a href="<?php echo $baseUrl . ($filters['page'] + 1); ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Next</a>
         <?php else: ?>
@@ -189,7 +148,7 @@
             <h3 class="font-bold text-xl text-gray-800">Add New Expense</h3>
         </div>
         
-        <form action="/expenses/daily/create" method="POST" class="p-6 space-y-4">
+        <form action="/expenses/daily/store" method="POST" class="p-6 space-y-4">
             
             <div class="grid grid-cols-2 gap-4">
                 <div>
@@ -207,8 +166,7 @@
 
             <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Source Account</label>
-                <select name="financial_account_id" id="sourceAccountSelect" class="w-full border p-2 rounded text-sm bg-white" required>
-                    </select>
+                <select name="financial_account_id" id="sourceAccountSelect" class="w-full border p-2 rounded text-sm bg-white" required></select>
             </div>
 
             <div id="bankOptions" class="hidden bg-blue-50 p-3 rounded border border-blue-100 space-y-3">
@@ -239,9 +197,7 @@
                 <select name="category_id" class="w-full border p-2 rounded text-sm bg-white" required>
                     <option value="">Select Category...</option>
                     <?php foreach($categories as $cat): ?>
-                        <option value="<?php echo $cat['id']; ?>">
-                            <?php echo $cat['code'] . ' - ' . $cat['name']; ?>
-                        </option>
+                        <option value="<?php echo $cat['id']; ?>"><?php echo $cat['code'] . ' - ' . $cat['name']; ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -267,7 +223,6 @@
                     <input type="number" step="0.01" name="tendered_amount" id="tenderedAmount" oninput="calculateChange()" class="w-full border p-2 rounded text-sm" placeholder="0.00">
                     <p class="text-[10px] text-gray-500 mt-1">We will record the tendered amount as the expense for now.</p>
                 </div>
-                
                 <div class="text-right mt-2 text-sm font-bold text-green-600" id="changeDisplay"></div>
             </div>
 
@@ -355,7 +310,7 @@ const allAccounts = <?php echo json_encode($allFinancialAccounts); ?>;
 
 function openModal() {
     document.getElementById('expenseModal').classList.remove('hidden');
-    updateFormUI(); // Initialize dropdowns
+    updateFormUI(); 
 }
 
 function updateFormUI() {
@@ -364,7 +319,6 @@ function updateFormUI() {
     const calc = document.getElementById('calculatorContainer');
     const bankOpts = document.getElementById('bankOptions');
 
-    // Filter Dropdown
     select.innerHTML = "";
     const filtered = allAccounts.filter(acc => acc.type === type);
     filtered.forEach(acc => {
@@ -377,7 +331,7 @@ function updateFormUI() {
     if (type === 'bank') {
         calc.style.display = 'none'; // Hide Calculator
         bankOpts.classList.remove('hidden'); // Show Check Options
-        document.getElementById('toggleChange').checked = false; // Reset checkbox
+        document.getElementById('toggleChange').checked = false; 
     } else {
         calc.style.display = 'block'; // Show Calculator
         bankOpts.classList.add('hidden'); // Hide Check Options
@@ -392,7 +346,6 @@ function toggleCheckInputs() {
     const payee = document.getElementById('inputPayee');
     const payFromType = document.getElementById('payFromType').value;
 
-    // Only show if Pay Type is Bank AND Method is Check
     if (payFromType === 'bank' && method === 'check') {
         inputs.classList.remove('hidden');
         checkNum.required = true;
@@ -409,7 +362,6 @@ function toggleCheckInputs() {
 function toggleCalculator() {
     const isChecked = document.getElementById('toggleChange').checked;
     const tenderedSec = document.getElementById('tenderedSection');
-    
     if (isChecked) {
         tenderedSec.classList.remove('hidden');
     } else {
@@ -421,7 +373,6 @@ function toggleCalculator() {
 function calculateChange() {
     const tendered = parseFloat(document.getElementById('tenderedAmount').value) || 0;
     const actual = parseFloat(document.getElementById('mainAmount').value) || 0;
-    
     if (tendered > 0) {
         let change = tendered - actual;
         document.getElementById('changeDisplay').innerText = "Change: ₱" + change.toLocaleString('en-US', {minimumFractionDigits: 2});
