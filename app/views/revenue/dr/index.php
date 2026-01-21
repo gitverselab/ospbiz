@@ -50,7 +50,7 @@
             <label class="text-xs font-bold text-gray-500 uppercase">To</label>
             <input type="date" name="to" value="<?= htmlspecialchars($filters['to'] ?? '') ?>" class="w-full border p-2 rounded text-sm">
         </div>
-
+        
         <div class="w-full md:w-24">
             <label class="text-xs font-bold text-gray-500 uppercase">Show</label>
             <select name="limit" class="w-full border p-2 rounded text-sm bg-white" onchange="this.form.submit()">
@@ -59,6 +59,7 @@
                 <option value="50" <?= (($filters['limit'] ?? 10) == 50) ? 'selected' : '' ?>>50</option>
             </select>
         </div>
+
         <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded text-sm font-medium hover:bg-blue-700">Filter</button>
     </div>
 </form>
@@ -169,7 +170,23 @@
     <div class="bg-white p-6 rounded-lg shadow-xl w-96">
         <h3 class="font-bold text-lg mb-4 text-gray-800">Import DR CSV</h3>
         <form action="/revenue/dr/import" method="POST" enctype="multipart/form-data">
+            
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Select Customer (Optional)</label>
+                <select name="import_customer_name" class="w-full border p-2 rounded text-sm bg-gray-50">
+                    <option value="">-- Use Name from CSV --</option>
+                    <?php foreach($customers as $c): ?>
+                        <option value="<?= htmlspecialchars($c['name'] ?? $c['customer_name']) ?>">
+                            <?= htmlspecialchars($c['name'] ?? $c['customer_name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="text-[10px] text-gray-400 mt-1">If selected, this applies to ALL imported rows.</p>
+            </div>
+
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">CSV File</label>
             <input type="file" name="csv_file" accept=".csv" required class="w-full border p-2 mb-4 rounded bg-gray-50 text-sm">
+            
             <div class="flex justify-end gap-2">
                 <button type="button" onclick="document.getElementById('importModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
                 <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Upload</button>

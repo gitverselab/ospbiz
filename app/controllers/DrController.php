@@ -4,18 +4,15 @@ class DrController {
     public function index() {
         $db = Database::getInstance();
         
-        // 1. GET FILTERS
         $search = $_GET['search'] ?? '';
         $customer = $_GET['customer'] ?? '';
         $fromDate = $_GET['from'] ?? '';
         $toDate = $_GET['to'] ?? '';
         
-        // Pagination Parameters
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
         $offset = ($page - 1) * $limit;
 
-        // 2. BUILD QUERY
         $where = "1=1";
         $params = [];
 
@@ -27,17 +24,12 @@ class DrController {
         if ($fromDate) { $where .= " AND d.date >= ?"; $params[] = $fromDate; }
         if ($toDate) { $where .= " AND d.date <= ?"; $params[] = $toDate; }
 
-        // 3. COUNT
-        $countSql = "SELECT COUNT(*) as total 
-                     FROM dr_lines l 
-                     JOIN delivery_receipts d ON l.dr_id = d.id 
-                     WHERE $where";
+        $countSql = "SELECT COUNT(*) as total FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
         $totalRecords = $stmtCount->fetch()['total'];
         $totalPages = ceil($totalRecords / $limit);
 
-        // 4. FETCH DATA
         $sql = "SELECT l.*, 
                        d.id as dr_id, d.dr_number, d.date, d.customer_name, 
                        d.po_number, d.status, d.currency, d.is_vat_inc
@@ -51,25 +43,9 @@ class DrController {
         $stmt->execute($params);
         $drs = $stmt->fetchAll();
 
-        // 5. Customer Dropdown
-        try {
-            $customers = $db->query("SELECT * FROM customers ORDER BY name")->fetchAll();
-        } catch (Exception $e) {
-            $customers = $db->query("SELECT DISTINCT customer_name as name FROM delivery_receipts ORDER BY customer_name")->fetchAll();
-        }
+        try { $customers = $db->query("SELECT * FROM customers ORDER BY name")->fetchAll(); } catch (Exception $e) { $customers = []; }
 
-        // FIX: Ensure all keys exist to prevent "Undefined array key" errors
-        $filters = [
-            'search' => $search,
-            'customer' => $customer,
-            'from' => $fromDate,
-            'to' => $toDate,
-            'limit' => $limit,
-            'page' => $page,
-            'total_pages' => $totalPages,    // Fixed Key
-            'total_records' => $totalRecords // Fixed Key
-        ];
-
+        $filters = compact('search', 'customer', 'fromDate', 'toDate', 'limit', 'page', 'totalPages', 'totalRecords');
         $pageTitle = "DR Management";
         $childView = ROOT_PATH . '/app/views/revenue/dr/index.php';
         require_once ROOT_PATH . '/app/views/layouts/main.php';
@@ -90,9 +66,7 @@ class DrController {
         $dr = $db->query("SELECT * FROM delivery_receipts WHERE id = $id")->fetch();
         if (!$dr) die("DR not found");
         $lines = $db->query("SELECT * FROM dr_lines WHERE dr_id = $id")->fetchAll();
-        
         try { $customers = $db->query("SELECT * FROM customers ORDER BY name")->fetchAll(); } catch (Exception $e) { $customers = []; }
-
         $pageTitle = "Edit DR";
         $childView = ROOT_PATH . '/app/views/revenue/dr/create.php';
         require_once ROOT_PATH . '/app/views/layouts/main.php';
@@ -128,7 +102,6 @@ class DrController {
                     $drId = $db->lastInsertId();
                 }
 
-                // Save Lines
                 $lines = json_decode($_POST['lines_json'], true);
                 if (is_array($lines)) {
                     $lineStmt = $db->prepare("INSERT INTO dr_lines (dr_id, item_code, description, quantity, uom, price, amount, gr_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
@@ -143,14 +116,10 @@ class DrController {
 
                 $db->commit();
                 header("Location: /revenue/dr");
-            } catch (Exception $e) {
-                $db->rollBack();
-                die($e->getMessage());
-            }
+            } catch (Exception $e) { $db->rollBack(); die($e->getMessage()); }
         }
     }
 
-    // --- DELETE ---
     public function delete() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
@@ -161,7 +130,7 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Fixed Dates) ---
+    // --- IMPORT (Fixed GR, Customer, Price) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -169,6 +138,9 @@ class DrController {
             fgetcsv($file); 
 
             $success = 0;
+            // Get override customer if selected
+            $overrideCustomer = !empty($_POST['import_customer_name']) ? $_POST['import_customer_name'] : null;
+
             $db->beginTransaction();
             try {
                 while (($row = fgetcsv($file)) !== FALSE) {
@@ -180,22 +152,37 @@ class DrController {
                     $drNum = trim($row[6]);
                     if (empty($drNum)) continue;
 
+                    // Use Override Customer OR CSV Customer
+                    $custName = $overrideCustomer ?? $row[9];
+
                     $dr = $db->query("SELECT id FROM delivery_receipts WHERE dr_number = '$drNum'")->fetch();
                     if (!$dr) {
+                        // FIX: Added gr_number (from row 4) to Header if needed, but primarily line item
+                        // Insert Header
                         $stmt = $db->prepare("INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, 'delivered', ?, ?)");
-                        $stmt->execute([$drNum, $finalDate, $row[9], $row[8], $row[11], 'PHP', $row[10]]);
+                        $stmt->execute([$drNum, $finalDate, $custName, $row[8], $row[11], 'PHP', $row[10]]);
                         $drId = $db->lastInsertId();
                         $success++;
                     } else {
                         $drId = $dr['id'];
                     }
 
+                    // FIX: Price Logic
+                    // User says: Template Price ($row[5]) is VAT EXCLUSIVE.
+                    // If is_vat_inc ($row[10]) is 1, then we must inflate amount to be VAT Inclusive.
                     $qty = floatval(str_replace(',', '', $row[2]));
-                    $price = floatval(str_replace(',', '', $row[5]));
-                    $amount = $qty * $price;
+                    $priceExVat = floatval(str_replace(',', '', $row[5]));
+                    $isVatInc = $row[10];
 
+                    if ($isVatInc == 1) {
+                        $amount = ($qty * $priceExVat) * 1.12; // Add 12% VAT
+                    } else {
+                        $amount = ($qty * $priceExVat);
+                    }
+
+                    // Insert Line with GR Number ($row[4])
                     $db->prepare("INSERT INTO dr_lines (dr_id, item_code, description, quantity, uom, price, amount, gr_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-                       ->execute([$drId, $row[0], $row[1], $qty, $row[3], $price, $amount, $row[4]]);
+                       ->execute([$drId, $row[0], $row[1], $qty, $row[3], $priceExVat, $amount, $row[4]]);
                 }
                 $db->commit();
                 
