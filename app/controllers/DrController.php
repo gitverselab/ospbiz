@@ -24,14 +24,19 @@ class DrController {
         if ($fromDate) { $where .= " AND d.date >= ?"; $params[] = $fromDate; }
         if ($toDate) { $where .= " AND d.date <= ?"; $params[] = $toDate; }
 
-        // --- FIX PAGINATION COUNT ---
-        // Use fetchColumn() for 100% reliability on counts
-        $countSql = "SELECT COUNT(*) FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
+        // --- PAGINATION FIX ---
+        // Changed to explicit alias 'total' and FETCH_ASSOC for reliability
+        $countSql = "SELECT COUNT(*) as total FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
-        $totalRecords = $stmtCount->fetchColumn(); 
-        $totalPages = $totalRecords > 0 ? ceil($totalRecords / $limit) : 1;
+        $res = $stmtCount->fetch(PDO::FETCH_ASSOC);
+        $totalRecords = $res ? (int)$res['total'] : 0;
+        
+        // Calculate pages (ensure at least 1)
+        $totalPages = ceil($totalRecords / $limit);
+        if ($totalPages < 1) $totalPages = 1;
 
+        // FETCH DATA
         $sql = "SELECT l.*, 
                        d.id as dr_id, d.dr_number, d.date, d.customer_name, 
                        d.po_number, d.status, d.currency, d.is_vat_inc
@@ -130,7 +135,7 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Enhanced Date Parser) ---
+    // --- IMPORT (Fixed Date Cleaning & Price) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -142,7 +147,6 @@ class DrController {
             $success = 0;
             $rowNum = 1;
             
-            // Get override customer
             $overrideCustomer = !empty($_POST['import_customer_name']) ? $_POST['import_customer_name'] : null;
 
             $db->beginTransaction();
@@ -150,32 +154,27 @@ class DrController {
                 while (($row = fgetcsv($file)) !== FALSE) {
                     $rowNum++;
                     
-                    // --- 1. DATE FIX: CLEAN & PARSE ---
+                    // --- 1. DATE CLEANER ---
+                    // Raw date from Col H (Index 7)
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
-                    $finalDate = date('Y-m-d'); // Fallback
+                    $finalDate = date('Y-m-d'); // Default fallback
 
                     if (!empty($rawDate)) {
-                        // Clean unseen characters
-                        $cleanDate = preg_replace('/[\x00-\x1F\x7F]/', '', $rawDate);
+                        // REMOVE all characters except Numbers and Slashes (Fixes hidden space issues)
+                        $cleanDate = preg_replace('/[^0-9\/]/', '', $rawDate);
 
-                        // Priority 1: MM/DD/YYYY (e.g. 12/23/2025)
+                        // Try parsing m/d/Y (e.g. 12/27/2025)
                         $d = DateTime::createFromFormat('m/d/Y', $cleanDate);
                         
-                        // Priority 2: M/D/YYYY (e.g. 1/5/2025 - single digits)
-                        if (!$d) $d = DateTime::createFromFormat('n/j/Y', $cleanDate);
-
-                        // Priority 3: YYYY-MM-DD
-                        if (!$d) $d = DateTime::createFromFormat('Y-m-d', $cleanDate);
-
-                        if ($d) {
+                        if ($d && $d->format('m/d/Y') === $cleanDate) {
                             $finalDate = $d->format('Y-m-d');
-                        } elseif (is_numeric($cleanDate)) {
-                            // Priority 4: Excel Serial
-                            $unixDate = ($cleanDate - 25569) * 86400;
+                        } elseif (is_numeric($rawDate)) {
+                            // Excel Serial Date (just in case)
+                            $unixDate = ($rawDate - 25569) * 86400;
                             $finalDate = gmdate("Y-m-d", $unixDate);
                         } else {
-                            // Priority 5: Standard PHP Parser
-                            $ts = strtotime($cleanDate);
+                            // Fallback to strtotime
+                            $ts = strtotime($rawDate);
                             if ($ts) $finalDate = date('Y-m-d', $ts);
                         }
                     }
@@ -187,14 +186,14 @@ class DrController {
                     $custName = $overrideCustomer ?? ($row[9] ?? 'Unknown');
                     $grNum = isset($row[12]) ? trim($row[12]) : ''; 
 
-                    // --- 3. HEADER ---
+                    // --- 3. CREATE HEADER ---
                     $dr = $db->query("SELECT id FROM delivery_receipts WHERE dr_number = '$drNum'")->fetch();
                     
                     if (!$dr) {
                         $stmt = $db->prepare("INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, gr_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)");
                         $stmt->execute([
                             $drNum, 
-                            $finalDate, 
+                            $finalDate, // Cleaned Date
                             $custName, 
                             $row[8] ?? '', 
                             $row[11] ?? '', 
@@ -232,6 +231,7 @@ class DrController {
         }
     }
     
+    // --- TEMPLATE & EXPORT ---
     public function template() {
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="dr_template.csv"');
