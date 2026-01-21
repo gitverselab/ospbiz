@@ -50,6 +50,15 @@
             <label class="text-xs font-bold text-gray-500 uppercase">To</label>
             <input type="date" name="to" value="<?= htmlspecialchars($filters['to'] ?? '') ?>" class="w-full border p-2 rounded text-sm">
         </div>
+
+        <div class="w-full md:w-24">
+            <label class="text-xs font-bold text-gray-500 uppercase">Show</label>
+            <select name="limit" class="w-full border p-2 rounded text-sm bg-white" onchange="this.form.submit()">
+                <option value="10" <?= (($filters['limit'] ?? 10) == 10) ? 'selected' : '' ?>>10</option>
+                <option value="25" <?= (($filters['limit'] ?? 10) == 25) ? 'selected' : '' ?>>25</option>
+                <option value="50" <?= (($filters['limit'] ?? 10) == 50) ? 'selected' : '' ?>>50</option>
+            </select>
+        </div>
         <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded text-sm font-medium hover:bg-blue-700">Filter</button>
     </div>
 </form>
