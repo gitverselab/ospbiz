@@ -139,7 +139,7 @@
     </table>
 </div>
 
-<div class="flex justify-between items-center mt-4">
+<div class="flex justify-between items-center mt-4 border-t pt-4">
     <div class="text-sm text-gray-500">
         Page <?= $filters['page'] ?? 1 ?> of <?= $filters['total_pages'] ?? 1 ?> 
         (Total <?= $filters['total_records'] ?? 0 ?> records)
@@ -147,17 +147,22 @@
     
     <div class="flex gap-2">
         <?php 
-            // 1. Prepare Base URL Parameters
-            $queryParams = $_GET;
+            // Build Base URL safely
+            $params = $_GET; 
+            unset($params['page']); // Remove current page from params
+            
+            // Rebuild query string (e.g., search=abc&limit=10)
+            $queryString = http_build_query($params);
+            
+            // If query string exists, append &page=, otherwise append ?page=
+            $baseUrl = $queryString ? '?' . $queryString . '&page=' : '?page=';
+
             $currPage = (int)($filters['page'] ?? 1);
             $maxPage = (int)($filters['total_pages'] ?? 1);
         ?>
 
-        <?php if ($currPage > 1): 
-            $queryParams['page'] = $currPage - 1;
-            $prevUrl = '?' . http_build_query($queryParams);
-        ?>
-            <a href="<?= $prevUrl ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50">
+        <?php if ($currPage > 1): ?>
+            <a href="<?= $baseUrl . ($currPage - 1) ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50 transition">
                 &laquo; Previous
             </a>
         <?php else: ?>
@@ -166,11 +171,8 @@
             </span>
         <?php endif; ?>
 
-        <?php if ($currPage < $maxPage): 
-            $queryParams['page'] = $currPage + 1;
-            $nextUrl = '?' . http_build_query($queryParams);
-        ?>
-            <a href="<?= $nextUrl ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50">
+        <?php if ($currPage < $maxPage): ?>
+            <a href="<?= $baseUrl . ($currPage + 1) ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50 transition">
                 Next &raquo;
             </a>
         <?php else: ?>

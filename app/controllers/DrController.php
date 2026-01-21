@@ -130,7 +130,7 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Fixed Date Parsing & Pagination Data) ---
+    // --- IMPORT (Fixed Date Logic & Pagination Support) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -150,18 +150,18 @@ class DrController {
                 while (($row = fgetcsv($file)) !== FALSE) {
                     $rowNum++;
                     
-                    // --- 1. SMART DATE FIX ---
-                    // This handles 12/27/2025, 2025-12-27, and Excel Serial Numbers
+                    // --- 1. SMART DATE PARSING ---
+                    // Handles: "12/27/2025", "2025-12-27", or Excel Serial "45285"
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
-                    $finalDate = date('Y-m-d'); // Default fallback
+                    $finalDate = date('Y-m-d'); // Default fallback to Today
 
                     if (!empty($rawDate)) {
-                        // Check if it's numeric (Excel Serial Date)
                         if (is_numeric($rawDate)) {
+                            // Handle Excel Serial Date
                             $unixDate = ($rawDate - 25569) * 86400;
                             $finalDate = gmdate("Y-m-d", $unixDate);
                         } else {
-                            // Use PHP's smart parser (Handles / and - automatically)
+                            // Handle Standard Date Text (MM/DD/YYYY)
                             $ts = strtotime($rawDate);
                             if ($ts !== false) {
                                 $finalDate = date('Y-m-d', $ts);
@@ -173,18 +173,18 @@ class DrController {
                     $drNum = isset($row[6]) ? trim($row[6]) : '';
                     if (empty($drNum)) continue; 
 
-                    // Customer & GR
+                    // Customer & GR (Col M = Index 12)
                     $custName = $overrideCustomer ?? ($row[9] ?? 'Unknown');
-                    $grNum = isset($row[12]) ? trim($row[12]) : ''; // Col M
+                    $grNum = isset($row[12]) ? trim($row[12]) : ''; 
 
-                    // --- 3. HEADER ---
+                    // --- 3. CREATE HEADER ---
                     $dr = $db->query("SELECT id FROM delivery_receipts WHERE dr_number = '$drNum'")->fetch();
                     
                     if (!$dr) {
                         $stmt = $db->prepare("INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, gr_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)");
                         $stmt->execute([
                             $drNum, 
-                            $finalDate, 
+                            $finalDate, // Uses the parsed date
                             $custName, 
                             $row[8] ?? '', 
                             $row[11] ?? '', 
@@ -198,7 +198,7 @@ class DrController {
                         $drId = $dr['id'];
                     }
 
-                    // --- 4. PRICE & VAT LOGIC ---
+                    // --- 4. PRICE LOGIC ---
                     $qty = floatval(str_replace(',', '', $row[2] ?? 0));
                     $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0)); 
 
