@@ -188,21 +188,42 @@ elseif ($uri === '/expenses/loan-payments/create') {
 elseif ($uri === '/expenses/loan-payments/store') {
     $c = new LoanPaymentController(); $c->store();
 }
-// --- REVENUE: DR ---
-elseif ($uri === '/revenue/dr') {
-    $c = new DrController(); $c->index();
-}
-elseif ($uri === '/revenue/dr/create') {
-    $c = new DrController(); $c->create();
-}
-elseif ($uri === '/revenue/dr/import') {
-    $c = new DrController(); $c->import();
-}
-elseif ($uri === '/revenue/dr/export') {
-    $c = new DrController(); $c->export();
-}
-elseif ($uri === '/revenue/dr/template') {
-    $c = new DrController(); $c->template();
+// --- REVENUE: DR MANAGEMENT ---
+elseif (strpos($uri, '/revenue/dr') === 0) {
+    $c = new DrController();
+    
+    // List Page
+    if ($uri === '/revenue/dr') {
+        $c->index();
+    }
+    // Create & Save
+    elseif ($uri === '/revenue/dr/create') {
+        $c->create();
+    }
+    elseif ($uri === '/revenue/dr/store') {
+        $c->store();
+    }
+    // Edit & Update
+    elseif ($uri === '/revenue/dr/edit') {
+        $c->edit();
+    }
+    elseif ($uri === '/revenue/dr/update') {
+        $c->update();
+    }
+    // Delete
+    elseif ($uri === '/revenue/dr/delete') {
+        $c->delete();
+    }
+    // Import / Export / Template
+    elseif ($uri === '/revenue/dr/import') {
+        $c->import();
+    }
+    elseif ($uri === '/revenue/dr/export') {
+        $c->export();
+    }
+    elseif ($uri === '/revenue/dr/template') {
+        $c->template();
+    }
 }
 
 // --- REVENUE: RTS ---
