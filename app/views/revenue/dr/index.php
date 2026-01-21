@@ -139,40 +139,58 @@
     </table>
 </div>
 
-<div class="flex justify-between items-center mt-4 border-t pt-4">
-    <div class="text-sm text-gray-500">
+<div class="flex flex-col md:flex-row justify-between items-center mt-4 border-t pt-4">
+    <div class="text-sm text-gray-500 mb-2 md:mb-0">
         Page <?= $filters['page'] ?? 1 ?> of <?= $filters['total_pages'] ?? 1 ?> 
         (Total <?= $filters['total_records'] ?? 0 ?> records)
     </div>
     
-    <div class="flex gap-2">
+    <div class="flex gap-1">
         <?php 
-            // Build URL safely
+            // 1. Build Base URL
             $params = $_GET; 
             unset($params['page']); 
             $baseUrl = '?' . http_build_query($params) . '&page=';
             
             $currPage = (int)($filters['page'] ?? 1);
             $maxPage = (int)($filters['total_pages'] ?? 1);
+            
+            // 2. Logic to show window of pages (e.g. 5 pages around current)
+            $start = max(1, $currPage - 2);
+            $end = min($maxPage, $currPage + 2);
+            
+            // Adjust if near beginning or end
+            if ($currPage <= 3) {
+                $end = min(5, $maxPage);
+            }
+            if ($currPage > $maxPage - 2) {
+                $start = max(1, $maxPage - 4);
+            }
         ?>
 
         <?php if ($currPage > 1): ?>
-            <a href="<?= $baseUrl . ($currPage - 1) ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50 transition">
-                &laquo; Previous
+            <a href="<?= $baseUrl . ($currPage - 1) ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50">
+                &laquo;
             </a>
         <?php else: ?>
-            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed select-none">
-                &laquo; Previous
+            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed">
+                &laquo;
             </span>
         <?php endif; ?>
 
+        <?php for ($i = $start; $i <= $end; $i++): ?>
+            <a href="<?= $baseUrl . $i ?>" class="px-3 py-1 border rounded text-sm <?= ($i == $currPage) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50' ?>">
+                <?= $i ?>
+            </a>
+        <?php endfor; ?>
+
         <?php if ($currPage < $maxPage): ?>
-            <a href="<?= $baseUrl . ($currPage + 1) ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50 transition">
-                Next &raquo;
+            <a href="<?= $baseUrl . ($currPage + 1) ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50">
+                &raquo;
             </a>
         <?php else: ?>
-            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed select-none">
-                Next &raquo;
+            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed">
+                &raquo;
             </span>
         <?php endif; ?>
     </div>

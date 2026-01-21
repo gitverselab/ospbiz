@@ -24,16 +24,21 @@ class DrController {
         if ($fromDate) { $where .= " AND d.date >= ?"; $params[] = $fromDate; }
         if ($toDate) { $where .= " AND d.date <= ?"; $params[] = $toDate; }
 
-        // --- 1. COUNT RECORDS (For Pagination) ---
-        $countSql = "SELECT COUNT(*) FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
+        // --- PAGINATION FIX (FAIL-SAFE COUNT) ---
+        // 1. Give the count a specific name: 'total_count'
+        // 2. Fetch as an Associative Array to guarantee we get the number
+        $countSql = "SELECT COUNT(*) as total_count FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
-        $totalRecords = $stmtCount->fetchColumn(); // Get the raw number
+        $row = $stmtCount->fetch(PDO::FETCH_ASSOC);
         
+        // Force integer cast. If row is false, default to 0.
+        $totalRecords = ($row && isset($row['total_count'])) ? (int)$row['total_count'] : 0;
+
         $totalPages = ceil($totalRecords / $limit);
         if ($totalPages < 1) $totalPages = 1;
 
-        // --- 2. FETCH DATA ---
+        // FETCH DATA
         $sql = "SELECT l.*, 
                        d.id as dr_id, d.dr_number, d.date, d.customer_name, 
                        d.po_number, d.status, d.currency, d.is_vat_inc
@@ -49,7 +54,7 @@ class DrController {
 
         try { $customers = $db->query("SELECT * FROM customers ORDER BY name")->fetchAll(); } catch (Exception $e) { $customers = []; }
 
-        // --- FIX: Map variable names explicitly for the View ---
+        // EXPLICIT MAPPING FOR VIEW
         $filters = [
             'search' => $search,
             'customer' => $customer,
@@ -57,8 +62,8 @@ class DrController {
             'to' => $toDate,
             'limit' => $limit,
             'page' => $page,
-            'total_pages' => $totalPages,      // snake_case for View
-            'total_records' => $totalRecords   // snake_case for View
+            'total_pages' => $totalPages,
+            'total_records' => $totalRecords 
         ];
 
         $pageTitle = "DR Management";
@@ -162,12 +167,12 @@ class DrController {
                     
                     // --- DATE FIX ---
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
-                    $finalDate = date('Y-m-d'); 
+                    $finalDate = null;
 
                     if (!empty($rawDate)) {
                         $cleanDate = preg_replace('/[^0-9\/\-]/', '', $rawDate);
                         
-                        // Try standard formats first
+                        // Try standard formats
                         $d = DateTime::createFromFormat('m/d/Y', $cleanDate);
                         if (!$d) $d = DateTime::createFromFormat('n/j/Y', $cleanDate);
                         if (!$d) $d = DateTime::createFromFormat('Y-m-d', $cleanDate);
@@ -179,11 +184,11 @@ class DrController {
                             $unixDate = ($cleanDate - 25569) * 86400;
                             $finalDate = gmdate("Y-m-d", $unixDate);
                         } else {
-                            // Last resort
                             $ts = strtotime($cleanDate);
                             if ($ts) $finalDate = date('Y-m-d', $ts);
                         }
                     }
+                    if (!$finalDate) $finalDate = date('Y-m-d');
 
                     // --- COLUMNS ---
                     $drNum = isset($row[6]) ? trim($row[6]) : '';
