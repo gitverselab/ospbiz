@@ -17,13 +17,6 @@
     </div>
 </div>
 
-<?php session_start(); if (isset($_SESSION['import_msg'])): ?>
-    <div class="mb-4 p-4 bg-green-100 text-green-700 rounded-md border border-green-200">
-        <strong><?= $_SESSION['import_msg'] ?></strong>
-    </div>
-    <?php unset($_SESSION['import_msg']); ?>
-<?php endif; ?>
-
 <form method="GET" action="/revenue/dr" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
     <div class="flex flex-col md:flex-row gap-4 items-end">
         <div class="flex-1 w-full">
@@ -58,7 +51,7 @@
         <thead class="bg-gray-50">
             <tr>
                 <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">DR # / GR #</th>
-                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Delivery Date</th>
+                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Date</th>
                 <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Customer</th>
                 <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Item Description</th>
                 <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Qty</th>
@@ -77,13 +70,17 @@
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4">
                         <div class="text-sm font-bold text-gray-800"><?= htmlspecialchars($d['dr_number']) ?></div>
-                        <?php if($d['gr_number']): ?>
-                            <div class="text-xs text-gray-500">GR: <?= htmlspecialchars($d['gr_number']) ?></div>
+                        
+                        <?php if(!empty($d['gr_number'])): ?>
+                            <div class="text-xs text-blue-600 font-mono">GR: <?= htmlspecialchars($d['gr_number']) ?></div>
+                        <?php endif; ?>
+                        
+                        <?php if($d['po_number']): ?>
+                            <div class="text-xs text-gray-400">PO: <?= htmlspecialchars($d['po_number']) ?></div>
                         <?php endif; ?>
                     </td>
 
                     <td class="px-6 py-4 text-sm text-gray-700"><?= $d['date'] ?></td>
-
                     <td class="px-6 py-4 text-sm font-medium text-gray-800"><?= htmlspecialchars($d['customer_name']) ?></td>
 
                     <td class="px-6 py-4">
@@ -101,7 +98,7 @@
                     </td>
 
                     <td class="px-6 py-4 text-center">
-                        <span class="px-3 py-1 text-xs font-bold text-white rounded-full 
+                        <span class="px-2 py-1 text-xs font-bold text-white rounded-full 
                             <?= ($d['status'] == 'delivered') ? 'bg-green-500' : 'bg-yellow-500' ?>">
                             <?= ucfirst($d['status']) ?>
                         </span>
@@ -111,7 +108,7 @@
                         <div class="flex flex-col gap-1">
                             <a href="/revenue/dr/edit?id=<?= $d['dr_id'] ?>" class="text-blue-600 hover:text-blue-800">Edit</a>
                             
-                            <form action="/revenue/dr/delete" method="POST" onsubmit="return confirm('Delete this DR and all its items?');">
+                            <form action="/revenue/dr/delete" method="POST" onsubmit="return confirm('Delete this entire DR?');">
                                 <input type="hidden" name="id" value="<?= $d['dr_id'] ?>">
                                 <button type="submit" class="text-red-500 hover:text-red-700">Delete</button>
                             </form>
