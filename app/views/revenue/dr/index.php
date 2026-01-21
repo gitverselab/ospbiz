@@ -141,27 +141,42 @@
 
 <div class="flex justify-between items-center mt-4">
     <div class="text-sm text-gray-500">
-        Showing Page <?= $filters['page'] ?? 1 ?> of <?= $filters['total_pages'] ?? 1 ?> 
+        Page <?= $filters['page'] ?? 1 ?> of <?= $filters['total_pages'] ?? 1 ?> 
         (Total <?= $filters['total_records'] ?? 0 ?> records)
     </div>
     
     <div class="flex gap-2">
         <?php 
-            $params = $_GET; unset($params['page']); 
-            $baseUrl = '?' . http_build_query($params) . '&page=';
-            $currPage = $filters['page'] ?? 1;
-            $maxPage = $filters['total_pages'] ?? 1;
+            // 1. Prepare Base URL Parameters
+            $queryParams = $_GET;
+            $currPage = (int)($filters['page'] ?? 1);
+            $maxPage = (int)($filters['total_pages'] ?? 1);
         ?>
-        <?php if ($currPage > 1): ?>
-            <a href="<?= $baseUrl . ($currPage - 1) ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Previous</a>
+
+        <?php if ($currPage > 1): 
+            $queryParams['page'] = $currPage - 1;
+            $prevUrl = '?' . http_build_query($queryParams);
+        ?>
+            <a href="<?= $prevUrl ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50">
+                &laquo; Previous
+            </a>
         <?php else: ?>
-            <span class="px-3 py-1 bg-gray-100 border rounded text-gray-400 text-sm cursor-not-allowed">Previous</span>
+            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed">
+                &laquo; Previous
+            </span>
         <?php endif; ?>
 
-        <?php if ($currPage < $maxPage): ?>
-            <a href="<?= $baseUrl . ($currPage + 1) ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Next</a>
+        <?php if ($currPage < $maxPage): 
+            $queryParams['page'] = $currPage + 1;
+            $nextUrl = '?' . http_build_query($queryParams);
+        ?>
+            <a href="<?= $nextUrl ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50">
+                Next &raquo;
+            </a>
         <?php else: ?>
-            <span class="px-3 py-1 bg-gray-100 border rounded text-gray-400 text-sm cursor-not-allowed">Next</span>
+            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed">
+                Next &raquo;
+            </span>
         <?php endif; ?>
     </div>
 </div>

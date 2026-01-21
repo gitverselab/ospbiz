@@ -130,7 +130,7 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Fixed Date, GR, and Price) ---
+    // --- IMPORT (Fixed Date Parsing & Pagination Data) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -150,18 +150,18 @@ class DrController {
                 while (($row = fgetcsv($file)) !== FALSE) {
                     $rowNum++;
                     
-                    // --- 1. ROBUST DATE FIX ---
+                    // --- 1. SMART DATE FIX ---
                     // This handles 12/27/2025, 2025-12-27, and Excel Serial Numbers
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
-                    $finalDate = date('Y-m-d'); // Default to today
+                    $finalDate = date('Y-m-d'); // Default fallback
 
                     if (!empty($rawDate)) {
-                        // Check if it's numeric (Excel Serial Date like 45285)
+                        // Check if it's numeric (Excel Serial Date)
                         if (is_numeric($rawDate)) {
                             $unixDate = ($rawDate - 25569) * 86400;
                             $finalDate = gmdate("Y-m-d", $unixDate);
                         } else {
-                            // Try standard text parsing (Works best for 12/27/2025)
+                            // Use PHP's smart parser (Handles / and - automatically)
                             $ts = strtotime($rawDate);
                             if ($ts !== false) {
                                 $finalDate = date('Y-m-d', $ts);
@@ -175,7 +175,7 @@ class DrController {
 
                     // Customer & GR
                     $custName = $overrideCustomer ?? ($row[9] ?? 'Unknown');
-                    $grNum = isset($row[12]) ? trim($row[12]) : ''; // Col M (Index 12)
+                    $grNum = isset($row[12]) ? trim($row[12]) : ''; // Col M
 
                     // --- 3. HEADER ---
                     $dr = $db->query("SELECT id FROM delivery_receipts WHERE dr_number = '$drNum'")->fetch();
@@ -202,10 +202,7 @@ class DrController {
                     $qty = floatval(str_replace(',', '', $row[2] ?? 0));
                     $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0)); 
 
-                    // Unit Price (Ex Vat)
                     $unitPrice = ($qty > 0) ? ($totalExVat / $qty) : 0;
-                    
-                    // Final Amount (Inc Vat) = ExVat * 1.12
                     $finalAmount = $totalExVat * 1.12; 
 
                     // --- 5. INSERT LINE ---
@@ -230,8 +227,8 @@ class DrController {
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="dr_template.csv"');
         $output = fopen('php://output', 'w');
-        fputcsv($output, ['Item Code', 'Description', 'Qty', 'UOM', 'GR Number', 'Price', 'DR Number', 'Date (MM/DD/YYYY)', 'Plant Code', 'Customer', 'Vat Inc (1=Yes)', 'PO Number']);
-        fputcsv($output, ['ITEM001', 'Sample Item', '10', 'PCS', 'GR-888', '100.00', 'DR-2023-001', date('m/d/Y'), 'PL01', 'Customer Name', '1', 'PO-999']);
+        fputcsv($output, ['Item Code', 'Description', 'Qty', 'UOM', 'GR Number', 'Price', 'DR Number', 'Date (MM/DD/YYYY)', 'Plant Code', 'Customer', 'Vat Inc (1=Yes)', 'PO Number', 'GR Number']);
+        fputcsv($output, ['ITEM001', 'Sample Item', '10', 'PCS', 'GR-888', '100.00', 'DR-2023-001', date('m/d/Y'), 'PL01', 'Customer Name', '1', 'PO-999', 'GR-999']);
         fclose($output);
         exit();
     }
