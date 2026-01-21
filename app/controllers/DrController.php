@@ -30,7 +30,7 @@ class DrController {
         $totalRecords = $stmtCount->fetch()['total'];
         $totalPages = ceil($totalRecords / $limit);
 
-        // FIX: Explicitly select d.id as dr_id for the Edit Link
+        // Explicitly select d.id as dr_id for the Edit Link
         $sql = "SELECT l.*, 
                        d.id as dr_id, d.dr_number, d.date, d.customer_name, 
                        d.po_number, d.status, d.currency, d.is_vat_inc
@@ -44,14 +44,24 @@ class DrController {
         $stmt->execute($params);
         $drs = $stmt->fetchAll();
 
-        // Customer Dropdown
         try {
             $customers = $db->query("SELECT * FROM customers ORDER BY name")->fetchAll();
         } catch (Exception $e) {
             $customers = $db->query("SELECT DISTINCT customer_name as name FROM delivery_receipts ORDER BY customer_name")->fetchAll();
         }
 
-        $filters = compact('search', 'customer', 'fromDate', 'toDate', 'limit', 'page', 'totalPages', 'totalRecords');
+        // FIX: Manually map the keys so they match what the View expects ('from', 'total_pages', etc.)
+        $filters = [
+            'search' => $search,
+            'customer' => $customer,
+            'from' => $fromDate,           // View expects 'from'
+            'to' => $toDate,               // View expects 'to'
+            'limit' => $limit,
+            'page' => $page,
+            'total_pages' => $totalPages,   // View expects 'total_pages' (snake_case)
+            'total_records' => $totalRecords // View expects 'total_records'
+        ];
+
         $pageTitle = "DR Management";
         $childView = ROOT_PATH . '/app/views/revenue/dr/index.php';
         require_once ROOT_PATH . '/app/views/layouts/main.php';
@@ -110,7 +120,7 @@ class DrController {
                     $drId = $db->lastInsertId();
                 }
 
-                // Save Lines (Including GR Number per line)
+                // Save Lines
                 $lines = json_decode($_POST['lines_json'], true);
                 if (is_array($lines)) {
                     $lineStmt = $db->prepare("INSERT INTO dr_lines (dr_id, item_code, description, quantity, uom, price, amount, gr_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
@@ -118,7 +128,6 @@ class DrController {
                         $qty = floatval($line['quantity']);
                         $price = floatval($line['price']);
                         $amount = $qty * $price;
-                        // Default GR to header GR if line GR is empty, or just use input
                         $gr = $line['gr_number'] ?? $_POST['gr_number'] ?? ''; 
                         $lineStmt->execute([$drId, $line['item_code'], $line['description'], $qty, $line['uom'], $price, $amount, $gr]);
                     }
@@ -144,18 +153,17 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Fixed Dates & Grouping) ---
+    // --- IMPORT (Fixed Dates) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
             $file = fopen($_FILES['csv_file']['tmp_name'], 'r');
-            fgetcsv($file); // Skip Header
+            fgetcsv($file); 
 
             $success = 0;
             $db->beginTransaction();
             try {
                 while (($row = fgetcsv($file)) !== FALSE) {
-                    // FIX: Date Conversion (MM/DD/YYYY -> YYYY-MM-DD)
                     $rawDate = trim($row[7]); 
                     $dateObj = DateTime::createFromFormat('m/d/Y', $rawDate);
                     if (!$dateObj) $dateObj = DateTime::createFromFormat('Y-m-d', $rawDate); 
@@ -164,7 +172,6 @@ class DrController {
                     $drNum = trim($row[6]);
                     if (empty($drNum)) continue;
 
-                    // Get or Create Header
                     $dr = $db->query("SELECT id FROM delivery_receipts WHERE dr_number = '$drNum'")->fetch();
                     if (!$dr) {
                         $stmt = $db->prepare("INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, 'delivered', ?, ?)");
@@ -175,8 +182,6 @@ class DrController {
                         $drId = $dr['id'];
                     }
 
-                    // Insert Line (WITH GR NUMBER)
-                    // Row 4 is GR Number from your template
                     $qty = floatval(str_replace(',', '', $row[2]));
                     $price = floatval(str_replace(',', '', $row[5]));
                     $amount = $qty * $price;
