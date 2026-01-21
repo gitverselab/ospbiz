@@ -130,66 +130,124 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Fixed GR, Customer, Price) ---
+    // --- IMPORT (Fixed GR Column M, Date, & Price Logic) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
             $file = fopen($_FILES['csv_file']['tmp_name'], 'r');
+            
+            // Skip Header Row
             fgetcsv($file); 
 
             $success = 0;
-            // Get override customer if selected
+            $errors = [];
+            $rowNum = 1;
+
+            // Get override customer if selected in modal
             $overrideCustomer = !empty($_POST['import_customer_name']) ? $_POST['import_customer_name'] : null;
 
             $db->beginTransaction();
             try {
                 while (($row = fgetcsv($file)) !== FALSE) {
-                    $rawDate = trim($row[7]); 
-                    $dateObj = DateTime::createFromFormat('m/d/Y', $rawDate);
-                    if (!$dateObj) $dateObj = DateTime::createFromFormat('Y-m-d', $rawDate); 
-                    $finalDate = $dateObj ? $dateObj->format('Y-m-d') : date('Y-m-d');
+                    $rowNum++;
+                    
+                    // --- 1. FIX DATE PARSING (12/27/2025 -> 2025-12-27) ---
+                    $rawDate = isset($row[7]) ? trim($row[7]) : '';
+                    $finalDate = date('Y-m-d'); // Default to today if fail
 
-                    $drNum = trim($row[6]);
-                    if (empty($drNum)) continue;
+                    if (!empty($rawDate)) {
+                        // Try typical excel/csv formats
+                        $formats = ['m/d/Y', 'n/j/Y', 'Y-m-d', 'd-m-Y'];
+                        foreach ($formats as $fmt) {
+                            $d = DateTime::createFromFormat($fmt, $rawDate);
+                            if ($d && $d->format($fmt) == $rawDate) {
+                                $finalDate = $d->format('Y-m-d');
+                                break;
+                            }
+                        }
+                    }
 
-                    // Use Override Customer OR CSV Customer
-                    $custName = $overrideCustomer ?? $row[9];
+                    // --- 2. MAP COLUMNS ---
+                    $drNum = isset($row[6]) ? trim($row[6]) : '';
+                    if (empty($drNum)) continue; // Skip empty rows
 
+                    // Customer Name: Override or CSV Column J (Index 9)
+                    $custName = $overrideCustomer ?? ($row[9] ?? 'Unknown');
+                    
+                    // GR Number: User specified Column M (Index 12)
+                    $grNumHeader = isset($row[12]) ? trim($row[12]) : ''; 
+
+                    // --- 3. CREATE/FIND HEADER ---
                     $dr = $db->query("SELECT id FROM delivery_receipts WHERE dr_number = '$drNum'")->fetch();
+                    
                     if (!$dr) {
-                        // FIX: Added gr_number (from row 4) to Header if needed, but primarily line item
-                        // Insert Header
-                        $stmt = $db->prepare("INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, 'delivered', ?, ?)");
-                        $stmt->execute([$drNum, $finalDate, $custName, $row[8], $row[11], 'PHP', $row[10]]);
+                        $stmt = $db->prepare("INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, gr_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)");
+                        
+                        // Mapping:
+                        // $row[8] = Plant Code (Col I)
+                        // $row[11] = PO Number (Col L)
+                        // $row[10] = Vat Inc (Col K) -> 1 or 0
+                        
+                        $stmt->execute([
+                            $drNum, 
+                            $finalDate, 
+                            $custName, 
+                            $row[8] ?? '', 
+                            $row[11] ?? '', 
+                            $grNumHeader, // Save GR to Header too
+                            'PHP', 
+                            $row[10] ?? 0
+                        ]);
                         $drId = $db->lastInsertId();
                         $success++;
                     } else {
                         $drId = $dr['id'];
                     }
 
-                    // FIX: Price Logic
-                    // User says: Template Price ($row[5]) is VAT EXCLUSIVE.
-                    // If is_vat_inc ($row[10]) is 1, then we must inflate amount to be VAT Inclusive.
-                    $qty = floatval(str_replace(',', '', $row[2]));
-                    $priceExVat = floatval(str_replace(',', '', $row[5]));
-                    $isVatInc = $row[10];
+                    // --- 4. PRICE LOGIC (Total Ex-Vat) ---
+                    // User Rule: "Price from import is VAT EX price for the declared qty"
+                    // Therefore: CSV Value = LINE TOTAL (Ex VAT)
+                    
+                    $qty = floatval(str_replace(',', '', $row[2] ?? 0));
+                    $csvTotalExVat = floatval(str_replace(',', '', $row[5] ?? 0)); // Col F
+                    $isVatInc = $row[10] ?? 0;
 
+                    // Calculate Unit Price (Backwards)
+                    $unitPrice = ($qty > 0) ? ($csvTotalExVat / $qty) : 0;
+
+                    // Calculate Final Amount for DB
+                    // If DB expects VAT Inclusive amount when is_vat_inc=1:
                     if ($isVatInc == 1) {
-                        $amount = ($qty * $priceExVat) * 1.12; // Add 12% VAT
+                        $finalAmount = $csvTotalExVat * 1.12; // Add 12% VAT
                     } else {
-                        $amount = ($qty * $priceExVat);
+                        $finalAmount = $csvTotalExVat; // Already Ex-Vat
                     }
 
-                    // Insert Line with GR Number ($row[4])
+                    // --- 5. INSERT LINE ITEM ---
+                    // GR Number: Column M (Index 12)
+                    $lineGr = isset($row[12]) ? trim($row[12]) : '';
+
                     $db->prepare("INSERT INTO dr_lines (dr_id, item_code, description, quantity, uom, price, amount, gr_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-                       ->execute([$drId, $row[0], $row[1], $qty, $row[3], $priceExVat, $amount, $row[4]]);
+                       ->execute([
+                           $drId, 
+                           $row[0] ?? '', // Item Code
+                           $row[1] ?? '', // Description
+                           $qty, 
+                           $row[3] ?? '', // UOM
+                           $unitPrice,    // Saved as Unit Price
+                           $finalAmount,  // Saved as Total Amount (Inc VAT if applicable)
+                           $lineGr        // GR Number on Line Item
+                       ]);
                 }
                 $db->commit();
                 
                 if (session_status() == PHP_SESSION_NONE) session_start();
                 $_SESSION['import_msg'] = "Imported $success New DRs successfully.";
 
-            } catch (Exception $e) { $db->rollBack(); die($e->getMessage()); }
+            } catch (Exception $e) { 
+                $db->rollBack(); 
+                die("Import Failed at Row $rowNum: " . $e->getMessage()); 
+            }
             header("Location: /revenue/dr");
         }
     }
