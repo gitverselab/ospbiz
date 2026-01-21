@@ -4,43 +4,43 @@
         <a href="/revenue/dr/create" class="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700 shadow font-bold">
             <i class="fa-solid fa-plus"></i> Manual Input
         </a>
-        
         <div class="h-8 w-px bg-gray-300 mx-1"></div>
-        
         <a href="/revenue/dr/template" class="bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700">
             <i class="fa-solid fa-download"></i> Template
         </a>
-        
         <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600">
             <i class="fa-solid fa-file-import"></i> Import CSV
         </button>
-        
         <a href="/revenue/dr/export" class="bg-gray-600 text-white px-3 py-2 rounded text-sm hover:bg-gray-700">
             <i class="fa-solid fa-file-export"></i> Export
         </a>
     </div>
 </div>
 
+<?php session_start(); if (isset($_SESSION['import_msg'])): ?>
+    <div class="mb-4 p-4 bg-green-100 text-green-700 rounded-md border border-green-200">
+        <strong><?= $_SESSION['import_msg'] ?></strong>
+    </div>
+    <?php unset($_SESSION['import_msg']); ?>
+<?php endif; ?>
+
 <form method="GET" action="/revenue/dr" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
     <div class="flex flex-col md:flex-row gap-4 items-end">
-        
         <div class="flex-1 w-full">
             <label class="text-xs font-bold text-gray-500 uppercase">Search</label>
             <input type="text" name="search" value="<?= htmlspecialchars($filters['search']) ?>" placeholder="PO, DR, GR or Item Code..." class="w-full border p-2 rounded text-sm">
         </div>
-
         <div class="w-full md:w-48">
             <label class="text-xs font-bold text-gray-500 uppercase">Customer</label>
             <select name="customer" class="w-full border p-2 rounded text-sm bg-white">
                 <option value="">All Customers</option>
                 <?php foreach($customers as $c): ?>
-                    <option value="<?= htmlspecialchars($c['customer_name']) ?>" <?= ($filters['customer'] == $c['customer_name']) ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($c['customer_name']) ?>
+                    <option value="<?= htmlspecialchars($c['name'] ?? $c['customer_name']) ?>" <?= ($filters['customer'] == ($c['name'] ?? $c['customer_name'])) ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($c['name'] ?? $c['customer_name']) ?>
                     </option>
                 <?php endforeach; ?>
             </select>
         </div>
-
         <div class="w-full md:w-32">
             <label class="text-xs font-bold text-gray-500 uppercase">From</label>
             <input type="date" name="from" value="<?= htmlspecialchars($filters['from']) ?>" class="w-full border p-2 rounded text-sm">
@@ -49,16 +49,6 @@
             <label class="text-xs font-bold text-gray-500 uppercase">To</label>
             <input type="date" name="to" value="<?= htmlspecialchars($filters['to']) ?>" class="w-full border p-2 rounded text-sm">
         </div>
-
-        <div class="w-full md:w-24">
-            <label class="text-xs font-bold text-gray-500 uppercase">Show</label>
-            <select name="limit" class="w-full border p-2 rounded text-sm bg-white" onchange="this.form.submit()">
-                <option value="10" <?= ($filters['limit'] == 10) ? 'selected' : '' ?>>10</option>
-                <option value="25" <?= ($filters['limit'] == 25) ? 'selected' : '' ?>>25</option>
-                <option value="50" <?= ($filters['limit'] == 50) ? 'selected' : '' ?>>50</option>
-            </select>
-        </div>
-
         <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded text-sm font-medium hover:bg-blue-700">Filter</button>
     </div>
 </form>
@@ -72,7 +62,6 @@
                 <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Customer</th>
                 <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Item Description</th>
                 <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Qty</th>
-                <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Total (Ex-VAT)</th>
                 <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Total (Inc-VAT)</th>
                 <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Status</th>
                 <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Actions</th>
@@ -80,11 +69,9 @@
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
             <?php if(empty($drs)): ?>
-                <tr><td colspan="9" class="px-6 py-8 text-center text-gray-500 italic">No records found.</td></tr>
+                <tr><td colspan="8" class="px-6 py-8 text-center text-gray-500 italic">No records found.</td></tr>
             <?php else: ?>
                 <?php foreach($drs as $d): 
-                    // Calculate VAT based on flag
-                    $exVat = $d['is_vat_inc'] ? ($d['amount'] / 1.12) : $d['amount'];
                     $incVat = $d['is_vat_inc'] ? $d['amount'] : ($d['amount'] * 1.12);
                 ?>
                 <tr class="hover:bg-gray-50">
@@ -92,9 +79,6 @@
                         <div class="text-sm font-bold text-gray-800"><?= htmlspecialchars($d['dr_number']) ?></div>
                         <?php if($d['gr_number']): ?>
                             <div class="text-xs text-gray-500">GR: <?= htmlspecialchars($d['gr_number']) ?></div>
-                        <?php endif; ?>
-                        <?php if($d['po_number']): ?>
-                            <div class="text-xs text-gray-400">PO: <?= htmlspecialchars($d['po_number']) ?></div>
                         <?php endif; ?>
                     </td>
 
@@ -108,12 +92,8 @@
                     </td>
 
                     <td class="px-6 py-4 text-right">
-                        <div class="text-sm text-gray-800"><?= number_format($d['quantity'], 4) ?></div>
+                        <div class="text-sm text-gray-800"><?= number_format($d['quantity'], 2) ?></div>
                         <div class="text-xs text-gray-500"><?= htmlspecialchars($d['uom']) ?></div>
-                    </td>
-
-                    <td class="px-6 py-4 text-right text-sm text-gray-600">
-                        <?= $d['currency'] ?> <?= number_format($exVat, 2) ?>
                     </td>
 
                     <td class="px-6 py-4 text-right text-sm font-bold text-gray-800">
@@ -129,8 +109,12 @@
 
                     <td class="px-6 py-4 text-center text-sm">
                         <div class="flex flex-col gap-1">
-                            <a href="#" class="text-blue-600 hover:text-blue-800">Edit</a>
-                            <a href="#" class="text-red-500 hover:text-red-700">Delete</a>
+                            <a href="/revenue/dr/edit?id=<?= $d['dr_id'] ?>" class="text-blue-600 hover:text-blue-800">Edit</a>
+                            
+                            <form action="/revenue/dr/delete" method="POST" onsubmit="return confirm('Delete this DR and all its items?');">
+                                <input type="hidden" name="id" value="<?= $d['dr_id'] ?>">
+                                <button type="submit" class="text-red-500 hover:text-red-700">Delete</button>
+                            </form>
                         </div>
                     </td>
                 </tr>
