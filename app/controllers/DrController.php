@@ -130,7 +130,7 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Fixed: GR on Col M, Date parsing, Price Calculation) ---
+    // --- IMPORT (Fixed Date 0014 Error & VAT Calculation) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -150,25 +150,35 @@ class DrController {
                 while (($row = fgetcsv($file)) !== FALSE) {
                     $rowNum++;
                     
-                    // --- 1. DATE FIX (Priority to MM/DD/YYYY) ---
+                    // --- 1. ROBUST DATE FIX (Force MM/DD/YYYY) ---
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
                     $finalDate = date('Y-m-d'); // Default to today
 
                     if (!empty($rawDate)) {
-                        // Check m/d/Y first (e.g. 12/27/2025)
-                        $d = DateTime::createFromFormat('m/d/Y', $rawDate);
-                        if (!$d) {
-                            // Fallback to Y-m-d or other formats
+                        // Check for slash format like 12/27/2025
+                        if (strpos($rawDate, '/') !== false) {
+                            $parts = explode('/', $rawDate);
+                            if (count($parts) == 3) {
+                                // Assume MM/DD/YYYY
+                                $m = $parts[0];
+                                $d = $parts[1];
+                                $y = $parts[2];
+                                // Fix 2-digit years if necessary, though CSV usually has 4
+                                if (strlen($y) == 2) $y = "20" . $y; 
+                                $finalDate = "$y-$m-$d";
+                            }
+                        } else {
+                            // Fallback for YYYY-MM-DD
                             $d = DateTime::createFromFormat('Y-m-d', $rawDate);
+                            if ($d) $finalDate = $d->format('Y-m-d');
                         }
-                        if ($d) $finalDate = $d->format('Y-m-d');
                     }
 
                     // --- 2. COLUMNS ---
                     $drNum = isset($row[6]) ? trim($row[6]) : '';
-                    if (empty($drNum)) continue; // Skip empty rows
+                    if (empty($drNum)) continue; 
 
-                    // Customer: Override OR Col J (Index 9)
+                    // Customer
                     $custName = $overrideCustomer ?? ($row[9] ?? 'Unknown');
                     
                     // GR Number: Column M (Index 12)
@@ -179,16 +189,16 @@ class DrController {
                     
                     if (!$dr) {
                         $stmt = $db->prepare("INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, gr_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)");
-                        // We force is_vat_inc = 1 because you want the final amount to be VAT Inclusive
+                        // Force is_vat_inc = 1 so the system knows the total stored is VAT Inclusive
                         $stmt->execute([
                             $drNum, 
                             $finalDate, 
                             $custName, 
-                            $row[8] ?? '', // Plant Code
-                            $row[11] ?? '', // PO Number
-                            $grNum,         // Save GR to Header
+                            $row[8] ?? '', 
+                            $row[11] ?? '', 
+                            $grNum,         
                             'PHP', 
-                            1               // Force 'Yes' (Inc VAT)
+                            1               
                         ]);
                         $drId = $db->lastInsertId();
                         $success++;
@@ -196,17 +206,14 @@ class DrController {
                         $drId = $dr['id'];
                     }
 
-                    // --- 4. PRICE LOGIC ---
-                    // Col C (2) = Qty
-                    // Col F (5) = Total Ex-Vat Amount (72984)
-                    
+                    // --- 4. PRICE LOGIC (Always add 12% VAT) ---
                     $qty = floatval(str_replace(',', '', $row[2] ?? 0));
-                    $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0));
+                    $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0)); // Col F (72984)
 
-                    // Calculate Unit Price: (72984 / 800 = 91.23)
+                    // Unit Price (Ex Vat)
                     $unitPrice = ($qty > 0) ? ($totalExVat / $qty) : 0;
 
-                    // Calculate Final Inc-Vat Total: (72984 * 1.12 = 81742.08)
+                    // Final Amount (Inc Vat) = ExVat * 1.12
                     $finalAmount = $totalExVat * 1.12; 
 
                     // --- 5. INSERT LINE ---
@@ -217,8 +224,8 @@ class DrController {
                            $row[1] ?? '', // Desc
                            $qty, 
                            $row[3] ?? '', // UOM
-                           $unitPrice,    // Unit Price (Ex Vat)
-                           $finalAmount,  // Total Amount (Inc Vat)
+                           $unitPrice,    // Saved as Unit Price (Ex Vat)
+                           $finalAmount,  // Saved as Total Amount (Inc Vat)
                            $grNum         // GR Number on Line
                        ]);
                 }
