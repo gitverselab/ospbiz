@@ -17,18 +17,26 @@
     </div>
 </div>
 
+<?php if (session_status() == PHP_SESSION_NONE) session_start(); 
+      if (isset($_SESSION['import_msg'])): ?>
+    <div class="mb-4 p-4 bg-green-100 text-green-700 rounded-md border border-green-200">
+        <strong><?= $_SESSION['import_msg'] ?></strong>
+    </div>
+    <?php unset($_SESSION['import_msg']); ?>
+<?php endif; ?>
+
 <form method="GET" action="/revenue/dr" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
     <div class="flex flex-col md:flex-row gap-4 items-end">
         <div class="flex-1 w-full">
             <label class="text-xs font-bold text-gray-500 uppercase">Search</label>
-            <input type="text" name="search" value="<?= htmlspecialchars($filters['search']) ?>" placeholder="PO, DR, GR or Item Code..." class="w-full border p-2 rounded text-sm">
+            <input type="text" name="search" value="<?= htmlspecialchars($filters['search'] ?? '') ?>" placeholder="PO, DR, GR or Item Code..." class="w-full border p-2 rounded text-sm">
         </div>
         <div class="w-full md:w-48">
             <label class="text-xs font-bold text-gray-500 uppercase">Customer</label>
             <select name="customer" class="w-full border p-2 rounded text-sm bg-white">
                 <option value="">All Customers</option>
                 <?php foreach($customers as $c): ?>
-                    <option value="<?= htmlspecialchars($c['name'] ?? $c['customer_name']) ?>" <?= ($filters['customer'] == ($c['name'] ?? $c['customer_name'])) ? 'selected' : '' ?>>
+                    <option value="<?= htmlspecialchars($c['name'] ?? $c['customer_name']) ?>" <?= (($filters['customer'] ?? '') == ($c['name'] ?? $c['customer_name'])) ? 'selected' : '' ?>>
                         <?= htmlspecialchars($c['name'] ?? $c['customer_name']) ?>
                     </option>
                 <?php endforeach; ?>
@@ -36,11 +44,11 @@
         </div>
         <div class="w-full md:w-32">
             <label class="text-xs font-bold text-gray-500 uppercase">From</label>
-            <input type="date" name="from" value="<?= htmlspecialchars($filters['from']) ?>" class="w-full border p-2 rounded text-sm">
+            <input type="date" name="from" value="<?= htmlspecialchars($filters['from'] ?? '') ?>" class="w-full border p-2 rounded text-sm">
         </div>
         <div class="w-full md:w-32">
             <label class="text-xs font-bold text-gray-500 uppercase">To</label>
-            <input type="date" name="to" value="<?= htmlspecialchars($filters['to']) ?>" class="w-full border p-2 rounded text-sm">
+            <input type="date" name="to" value="<?= htmlspecialchars($filters['to'] ?? '') ?>" class="w-full border p-2 rounded text-sm">
         </div>
         <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded text-sm font-medium hover:bg-blue-700">Filter</button>
     </div>
@@ -123,18 +131,27 @@
 
 <div class="flex justify-between items-center mt-4">
     <div class="text-sm text-gray-500">
-        Page <?= $filters['page'] ?> of <?= $filters['total_pages'] ?> (Total <?= $filters['total_records'] ?>)
+        Showing Page <?= $filters['page'] ?? 1 ?> of <?= $filters['total_pages'] ?? 1 ?> 
+        (Total <?= $filters['total_records'] ?? 0 ?> records)
     </div>
+    
     <div class="flex gap-2">
         <?php 
             $params = $_GET; unset($params['page']); 
             $baseUrl = '?' . http_build_query($params) . '&page=';
+            $currPage = $filters['page'] ?? 1;
+            $maxPage = $filters['total_pages'] ?? 1;
         ?>
-        <?php if ($filters['page'] > 1): ?>
-            <a href="<?= $baseUrl . ($filters['page'] - 1) ?>" class="px-3 py-1 bg-white border rounded text-sm">Prev</a>
+        <?php if ($currPage > 1): ?>
+            <a href="<?= $baseUrl . ($currPage - 1) ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Previous</a>
+        <?php else: ?>
+            <span class="px-3 py-1 bg-gray-100 border rounded text-gray-400 text-sm cursor-not-allowed">Previous</span>
         <?php endif; ?>
-        <?php if ($filters['page'] < $filters['total_pages']): ?>
-            <a href="<?= $baseUrl . ($filters['page'] + 1) ?>" class="px-3 py-1 bg-white border rounded text-sm">Next</a>
+
+        <?php if ($currPage < $maxPage): ?>
+            <a href="<?= $baseUrl . ($currPage + 1) ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Next</a>
+        <?php else: ?>
+            <span class="px-3 py-1 bg-gray-100 border rounded text-gray-400 text-sm cursor-not-allowed">Next</span>
         <?php endif; ?>
     </div>
 </div>
