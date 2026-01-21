@@ -24,14 +24,15 @@ class DrController {
         if ($fromDate) { $where .= " AND d.date >= ?"; $params[] = $fromDate; }
         if ($toDate) { $where .= " AND d.date <= ?"; $params[] = $toDate; }
 
-        // --- PAGINATION FIX (ROBUST COUNT) ---
-        // We count specific IDs to avoid ambiguity and use standard array fetching
-        $countSql = "SELECT COUNT(l.id) as total FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
+        // --- PAGINATION FIX (SAFE COUNT) ---
+        // We use an alias 'count_val' and FETCH_ASSOC to ensure we get a real number
+        $countSql = "SELECT COUNT(l.id) as count_val FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
-        $result = $stmtCount->fetch(PDO::FETCH_ASSOC);
-        $totalRecords = $result ? (int)$result['total'] : 0;
+        $countRow = $stmtCount->fetch(PDO::FETCH_ASSOC);
+        $totalRecords = $countRow ? (int)$countRow['count_val'] : 0;
         
+        // Calculate Total Pages
         $totalPages = ceil($totalRecords / $limit);
         if ($totalPages < 1) $totalPages = 1;
 
@@ -134,7 +135,7 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Fixed Date Parser & Price) ---
+    // --- IMPORT (Preserved Date Logic) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -153,77 +154,53 @@ class DrController {
                 while (($row = fgetcsv($file)) !== FALSE) {
                     $rowNum++;
                     
-                    // --- 1. SUPER DATE CLEANER ---
-                    // Raw date from Col H (Index 7)
+                    // --- DATE LOGIC ---
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
-                    $finalDate = null; // Do NOT default to today. Let it be null if fail.
+                    $finalDate = date('Y-m-d'); 
 
                     if (!empty($rawDate)) {
-                        // A. Check for Excel Serial (Numeric)
-                        if (is_numeric($rawDate)) {
-                            $unixDate = ($rawDate - 25569) * 86400;
+                        $cleanDate = preg_replace('/[^0-9\/\-]/', '', $rawDate);
+                        $d = DateTime::createFromFormat('m/d/Y', $cleanDate);
+                        if (!$d) $d = DateTime::createFromFormat('n/j/Y', $cleanDate);
+                        if (!$d) $d = DateTime::createFromFormat('Y-m-d', $cleanDate);
+
+                        if ($d) {
+                            $finalDate = $d->format('Y-m-d');
+                        } elseif (is_numeric($cleanDate)) {
+                            $unixDate = ($cleanDate - 25569) * 86400;
                             $finalDate = gmdate("Y-m-d", $unixDate);
-                        } 
-                        else {
-                            // B. Text Date: Remove everything that is NOT a number, slash, or dash
-                            $cleanDate = preg_replace('/[^0-9\/\-]/', '', $rawDate);
-
-                            // Try MM/DD/YYYY (Double digits)
-                            $d = DateTime::createFromFormat('m/d/Y', $cleanDate);
-                            // Try n/j/Y (Single digits, e.g. 1/5/2026)
-                            if (!$d) $d = DateTime::createFromFormat('n/j/Y', $cleanDate);
-                            // Try YYYY-MM-DD
-                            if (!$d) $d = DateTime::createFromFormat('Y-m-d', $cleanDate);
-
-                            if ($d) {
-                                $finalDate = $d->format('Y-m-d');
-                            } else {
-                                // Last resort: PHP smart parser
-                                $ts = strtotime($cleanDate);
-                                if ($ts) $finalDate = date('Y-m-d', $ts);
-                            }
+                        } else {
+                            $ts = strtotime($cleanDate);
+                            if ($ts) $finalDate = date('Y-m-d', $ts);
                         }
                     }
-                    
-                    // Fallback only if absolutely failed
-                    if (!$finalDate) $finalDate = date('Y-m-d');
 
-                    // --- 2. COLUMNS ---
+                    // --- COLUMNS ---
                     $drNum = isset($row[6]) ? trim($row[6]) : '';
                     if (empty($drNum)) continue; 
 
                     $custName = $overrideCustomer ?? ($row[9] ?? 'Unknown');
                     $grNum = isset($row[12]) ? trim($row[12]) : ''; 
 
-                    // --- 3. CREATE HEADER ---
+                    // --- HEADER ---
                     $dr = $db->query("SELECT id FROM delivery_receipts WHERE dr_number = '$drNum'")->fetch();
                     
                     if (!$dr) {
                         $stmt = $db->prepare("INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, gr_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)");
-                        $stmt->execute([
-                            $drNum, 
-                            $finalDate, 
-                            $custName, 
-                            $row[8] ?? '', 
-                            $row[11] ?? '', 
-                            $grNum, 
-                            'PHP', 
-                            1 // Force VAT Inc
-                        ]);
+                        $stmt->execute([$drNum, $finalDate, $custName, $row[8] ?? '', $row[11] ?? '', $grNum, 'PHP', 1]);
                         $drId = $db->lastInsertId();
                         $success++;
                     } else {
                         $drId = $dr['id'];
                     }
 
-                    // --- 4. PRICE LOGIC ---
+                    // --- PRICE LOGIC ---
                     $qty = floatval(str_replace(',', '', $row[2] ?? 0));
                     $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0)); 
-
                     $unitPrice = ($qty > 0) ? ($totalExVat / $qty) : 0;
                     $finalAmount = $totalExVat * 1.12; 
 
-                    // --- 5. INSERT LINE ---
+                    // --- LINE ---
                     $db->prepare("INSERT INTO dr_lines (dr_id, item_code, description, quantity, uom, price, amount, gr_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
                        ->execute([$drId, $row[0] ?? '', $row[1] ?? '', $qty, $row[3] ?? '', $unitPrice, $finalAmount, $grNum]);
                 }
