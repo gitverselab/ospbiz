@@ -4,15 +4,18 @@ class DrController {
     public function index() {
         $db = Database::getInstance();
         
+        // 1. GET FILTERS
         $search = $_GET['search'] ?? '';
         $customer = $_GET['customer'] ?? '';
         $fromDate = $_GET['from'] ?? '';
         $toDate = $_GET['to'] ?? '';
         
+        // Pagination Parameters
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
         $offset = ($page - 1) * $limit;
 
+        // 2. BUILD QUERY
         $where = "1=1";
         $params = [];
 
@@ -24,13 +27,17 @@ class DrController {
         if ($fromDate) { $where .= " AND d.date >= ?"; $params[] = $fromDate; }
         if ($toDate) { $where .= " AND d.date <= ?"; $params[] = $toDate; }
 
-        $countSql = "SELECT COUNT(*) as total FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
+        // 3. COUNT
+        $countSql = "SELECT COUNT(*) as total 
+                     FROM dr_lines l 
+                     JOIN delivery_receipts d ON l.dr_id = d.id 
+                     WHERE $where";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
         $totalRecords = $stmtCount->fetch()['total'];
         $totalPages = ceil($totalRecords / $limit);
 
-        // Explicitly select d.id as dr_id for the Edit Link
+        // 4. FETCH DATA
         $sql = "SELECT l.*, 
                        d.id as dr_id, d.dr_number, d.date, d.customer_name, 
                        d.po_number, d.status, d.currency, d.is_vat_inc
@@ -44,22 +51,23 @@ class DrController {
         $stmt->execute($params);
         $drs = $stmt->fetchAll();
 
+        // 5. Customer Dropdown
         try {
             $customers = $db->query("SELECT * FROM customers ORDER BY name")->fetchAll();
         } catch (Exception $e) {
             $customers = $db->query("SELECT DISTINCT customer_name as name FROM delivery_receipts ORDER BY customer_name")->fetchAll();
         }
 
-        // FIX: Manually map the keys so they match what the View expects ('from', 'total_pages', etc.)
+        // FIX: Ensure all keys exist to prevent "Undefined array key" errors
         $filters = [
             'search' => $search,
             'customer' => $customer,
-            'from' => $fromDate,           // View expects 'from'
-            'to' => $toDate,               // View expects 'to'
+            'from' => $fromDate,
+            'to' => $toDate,
             'limit' => $limit,
             'page' => $page,
-            'total_pages' => $totalPages,   // View expects 'total_pages' (snake_case)
-            'total_records' => $totalRecords // View expects 'total_records'
+            'total_pages' => $totalPages,    // Fixed Key
+            'total_records' => $totalRecords // Fixed Key
         ];
 
         $pageTitle = "DR Management";
