@@ -67,44 +67,82 @@ class DrController {
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
 
+    // --- CREATE & EDIT ---
     public function create() {
-        $pageTitle = "Create Delivery Receipt";
+        $db = Database::getInstance();
+        try { $customers = $db->query("SELECT * FROM customers ORDER BY name")->fetchAll(); } catch (Exception $e) { $customers = []; }
+        $pageTitle = "Create DR";
         $childView = ROOT_PATH . '/app/views/revenue/dr/create.php';
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
 
-    public function store() {
+    public function edit() {
+        $db = Database::getInstance();
+        $id = $_GET['id'] ?? 0;
+        $dr = $db->query("SELECT * FROM delivery_receipts WHERE id = $id")->fetch();
+        if (!$dr) die("DR not found");
+        $lines = $db->query("SELECT * FROM dr_lines WHERE dr_id = $id")->fetchAll();
+        try { $customers = $db->query("SELECT * FROM customers ORDER BY name")->fetchAll(); } catch (Exception $e) { $customers = []; }
+        $pageTitle = "Edit DR";
+        $childView = ROOT_PATH . '/app/views/revenue/dr/create.php';
+        require_once ROOT_PATH . '/app/views/layouts/main.php';
+    }
+
+    // --- STORE & UPDATE ---
+    public function store() { $this->save(false); }
+    public function update() { $this->save(true); }
+
+    private function save($isUpdate) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
             try {
                 $db->beginTransaction();
 
-                $sql = "INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, gr_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                $stmt = $db->prepare($sql);
-                $stmt->execute([
-                    $_POST['dr_number'], $_POST['date'], $_POST['customer_name'], 
-                    $_POST['plant_code'], $_POST['po_number'], $_POST['gr_number'], 
-                    $_POST['status'], $_POST['currency'], $_POST['is_vat_inc']
-                ]);
-                $drId = $db->lastInsertId();
+                if ($isUpdate) {
+                    $id = $_POST['id'];
+                    $sql = "UPDATE delivery_receipts SET dr_number=?, date=?, customer_name=?, plant_code=?, po_number=?, status=?, currency=?, is_vat_inc=? WHERE id=?";
+                    $db->prepare($sql)->execute([
+                        $_POST['dr_number'], $_POST['date'], $_POST['customer_name'], 
+                        $_POST['plant_code'], $_POST['po_number'], 
+                        $_POST['status'], $_POST['currency'], $_POST['is_vat_inc'], $id
+                    ]);
+                    $db->prepare("DELETE FROM dr_lines WHERE dr_id = ?")->execute([$id]);
+                    $drId = $id;
+                } else {
+                    $sql = "INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    $db->prepare($sql)->execute([
+                        $_POST['dr_number'], $_POST['date'], $_POST['customer_name'], 
+                        $_POST['plant_code'], $_POST['po_number'], 
+                        $_POST['status'], $_POST['currency'], $_POST['is_vat_inc']
+                    ]);
+                    $drId = $db->lastInsertId();
+                }
 
                 $lines = json_decode($_POST['lines_json'], true);
-                $lineStmt = $db->prepare("INSERT INTO dr_lines (dr_id, item_code, description, quantity, uom, price, amount) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                
-                foreach ($lines as $line) {
-                    $qty = floatval($line['quantity']);
-                    $price = floatval($line['price']);
-                    $amount = $qty * $price;
-                    $lineStmt->execute([$drId, $line['item_code'], $line['description'], $qty, $line['uom'], $price, $amount]);
+                if (is_array($lines)) {
+                    $lineStmt = $db->prepare("INSERT INTO dr_lines (dr_id, item_code, description, quantity, uom, price, amount, gr_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    foreach ($lines as $line) {
+                        $qty = floatval($line['quantity']);
+                        $price = floatval($line['price']);
+                        $amount = $qty * $price;
+                        $gr = $line['gr_number'] ?? $_POST['gr_number'] ?? ''; 
+                        $lineStmt->execute([$drId, $line['item_code'], $line['description'], $qty, $line['uom'], $price, $amount, $gr]);
+                    }
                 }
 
                 $db->commit();
                 header("Location: /revenue/dr");
+            } catch (Exception $e) { $db->rollBack(); die($e->getMessage()); }
+        }
+    }
 
-            } catch (Exception $e) {
-                $db->rollBack();
-                die($e->getMessage());
-            }
+    public function delete() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $db = Database::getInstance();
+            $id = $_POST['id'];
+            $db->prepare("DELETE FROM dr_lines WHERE dr_id = ?")->execute([$id]);
+            $db->prepare("DELETE FROM delivery_receipts WHERE id = ?")->execute([$id]);
+            header("Location: /revenue/dr");
         }
     }
 
