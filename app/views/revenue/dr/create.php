@@ -53,11 +53,7 @@ $actionUrl = $isEdit ? "/revenue/dr/update" : "/revenue/dr/store";
     </form>
 
 <script>
-// If Editing, pre-load lines
-const existingLines = <?= $isEdit ? json_encode($lines) : '[]' ?>;
-
-function addLine(data = null) {
-    // ... (Your existing addLine logic, but populate inputs if data exists) ...
+function addLine() {
     const tr = document.createElement('tr');
     tr.className = "border-b hover:bg-gray-50";
     tr.innerHTML = `
@@ -81,5 +77,45 @@ if (existingLines.length > 0) {
     addLine();
 }
 
-// ... (Rest of your JS functions: calcRow, calcTotal, prepareSubmit) ...
+function calcRow(el) {
+    const row = el.closest('tr');
+    const qty = parseFloat(row.querySelector('.qty').value) || 0;
+    const price = parseFloat(row.querySelector('.price').value) || 0;
+    const total = qty * price;
+    row.querySelector('.row-total').innerText = total.toLocaleString('en-US', {minimumFractionDigits: 2});
+    calcTotal();
+}
+
+function calcTotal() {
+    let grandTotal = 0;
+    document.querySelectorAll('#drLines tr').forEach(row => {
+        const qty = parseFloat(row.querySelector('.qty').value) || 0;
+        const price = parseFloat(row.querySelector('.price').value) || 0;
+        grandTotal += (qty * price);
+    });
+    document.getElementById('grandTotalDisplay').innerText = grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2});
+}
+
+function prepareSubmit(e) {
+    const lines = [];
+    document.querySelectorAll('#drLines tr').forEach(row => {
+        lines.push({
+            item_code: row.querySelector('.code').value,
+            description: row.querySelector('.desc').value,
+            quantity: row.querySelector('.qty').value,
+            uom: row.querySelector('.uom').value,
+            price: row.querySelector('.price').value
+        });
+    });
+    
+    if(lines.length === 0) {
+        alert("Add at least one item.");
+        e.preventDefault();
+        return;
+    }
+    document.getElementById('linesJson').value = JSON.stringify(lines);
+}
+
+// Init
+addLine();
 </script>

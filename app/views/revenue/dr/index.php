@@ -83,3 +83,34 @@
         </tbody>
     </table>
 </div>
+
+<div class="flex justify-between items-center mt-4">
+    <div class="text-sm text-gray-500">
+        Page <?= $filters['page'] ?> of <?= $filters['total_pages'] ?> (Total <?= $filters['total_records'] ?>)
+    </div>
+    <div class="flex gap-2">
+        <?php 
+            $params = $_GET; unset($params['page']); 
+            $baseUrl = '?' . http_build_query($params) . '&page=';
+        ?>
+        <?php if ($filters['page'] > 1): ?>
+            <a href="<?= $baseUrl . ($filters['page'] - 1) ?>" class="px-3 py-1 bg-white border rounded text-sm">Prev</a>
+        <?php endif; ?>
+        <?php if ($filters['page'] < $filters['total_pages']): ?>
+            <a href="<?= $baseUrl . ($filters['page'] + 1) ?>" class="px-3 py-1 bg-white border rounded text-sm">Next</a>
+        <?php endif; ?>
+    </div>
+</div>
+
+<div id="importModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg shadow-xl w-96">
+        <h3 class="font-bold text-lg mb-4 text-gray-800">Import DR CSV</h3>
+        <form action="/revenue/dr/import" method="POST" enctype="multipart/form-data">
+            <input type="file" name="csv_file" accept=".csv" required class="w-full border p-2 mb-4 rounded bg-gray-50 text-sm">
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="document.getElementById('importModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Upload</button>
+            </div>
+        </form>
+    </div>
+</div>
