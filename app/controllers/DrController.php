@@ -24,15 +24,17 @@ class DrController {
         if ($fromDate) { $where .= " AND d.date >= ?"; $params[] = $fromDate; }
         if ($toDate) { $where .= " AND d.date <= ?"; $params[] = $toDate; }
 
-        // --- PAGINATION FIX (SAFE COUNT) ---
-        // We use an alias 'count_val' and FETCH_ASSOC to ensure we get a real number
-        $countSql = "SELECT COUNT(l.id) as count_val FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
+        // --- PAGINATION FIX (FAIL-SAFE) ---
+        // 1. Give the count a specific name: 'total_count'
+        // 2. Fetch as an Associative Array to guarantee we get the number
+        $countSql = "SELECT COUNT(*) as total_count FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
-        $countRow = $stmtCount->fetch(PDO::FETCH_ASSOC);
-        $totalRecords = $countRow ? (int)$countRow['count_val'] : 0;
+        $row = $stmtCount->fetch(PDO::FETCH_ASSOC);
         
-        // Calculate Total Pages
+        // Force integer cast. If row is false, default to 0.
+        $totalRecords = ($row && isset($row['total_count'])) ? (int)$row['total_count'] : 0;
+
         $totalPages = ceil($totalRecords / $limit);
         if ($totalPages < 1) $totalPages = 1;
 
@@ -135,7 +137,7 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Preserved Date Logic) ---
+    // --- IMPORT (With Safe Date & Price Fixes) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -154,12 +156,14 @@ class DrController {
                 while (($row = fgetcsv($file)) !== FALSE) {
                     $rowNum++;
                     
-                    // --- DATE LOGIC ---
+                    // --- DATE FIX ---
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
                     $finalDate = date('Y-m-d'); 
 
                     if (!empty($rawDate)) {
                         $cleanDate = preg_replace('/[^0-9\/\-]/', '', $rawDate);
+                        
+                        // Try strict formats first
                         $d = DateTime::createFromFormat('m/d/Y', $cleanDate);
                         if (!$d) $d = DateTime::createFromFormat('n/j/Y', $cleanDate);
                         if (!$d) $d = DateTime::createFromFormat('Y-m-d', $cleanDate);
@@ -194,7 +198,7 @@ class DrController {
                         $drId = $dr['id'];
                     }
 
-                    // --- PRICE LOGIC ---
+                    // --- PRICE ---
                     $qty = floatval(str_replace(',', '', $row[2] ?? 0));
                     $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0)); 
                     $unitPrice = ($qty > 0) ? ($totalExVat / $qty) : 0;
