@@ -17,29 +17,22 @@ class DrController {
         $params = [];
 
         if ($search) {
-            $where .= " AND (d.dr_number LIKE ? OR d.po_number LIKE ? OR d.gr_number LIKE ? OR l.item_code LIKE ?)";
+            $where .= " AND (d.dr_number LIKE ? OR d.po_number LIKE ? OR l.gr_number LIKE ? OR l.item_code LIKE ?)";
             $params[] = "%$search%"; $params[] = "%$search%"; $params[] = "%$search%"; $params[] = "%$search%";
         }
-        if ($customer) {
-            $where .= " AND d.customer_name LIKE ?";
-            $params[] = "%$customer%";
-        }
+        if ($customer) { $where .= " AND d.customer_name LIKE ?"; $params[] = "%$customer%"; }
         if ($fromDate) { $where .= " AND d.date >= ?"; $params[] = $fromDate; }
         if ($toDate) { $where .= " AND d.date <= ?"; $params[] = $toDate; }
 
-        $countSql = "SELECT COUNT(*) as total 
-                     FROM dr_lines l 
-                     JOIN delivery_receipts d ON l.dr_id = d.id 
-                     WHERE $where";
+        $countSql = "SELECT COUNT(*) as total FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
         $totalRecords = $stmtCount->fetch()['total'];
         $totalPages = ceil($totalRecords / $limit);
 
-        // FETCH DATA
         $sql = "SELECT l.*, 
                        d.id as dr_id, d.dr_number, d.date, d.customer_name, 
-                       d.po_number, d.gr_number, d.status, d.currency, d.is_vat_inc
+                       d.po_number, d.status, d.currency, d.is_vat_inc
                 FROM dr_lines l
                 JOIN delivery_receipts d ON l.dr_id = d.id
                 WHERE $where
@@ -50,18 +43,9 @@ class DrController {
         $stmt->execute($params);
         $drs = $stmt->fetchAll();
 
-        // Customer Dropdown
-        try {
-            $customers = $db->query("SELECT DISTINCT customer_name FROM delivery_receipts ORDER BY customer_name")->fetchAll();
-        } catch (Exception $e) { $customers = []; }
+        try { $customers = $db->query("SELECT * FROM customers ORDER BY name")->fetchAll(); } catch (Exception $e) { $customers = []; }
 
-        $filters = [
-            'search' => $search, 'customer' => $customer, 
-            'from' => $fromDate, 'to' => $toDate,
-            'limit' => $limit, 'page' => $page, 
-            'total_pages' => $totalPages, 'total_records' => $totalRecords
-        ];
-
+        $filters = compact('search', 'customer', 'fromDate', 'toDate', 'limit', 'page', 'totalPages', 'totalRecords');
         $pageTitle = "DR Management";
         $childView = ROOT_PATH . '/app/views/revenue/dr/index.php';
         require_once ROOT_PATH . '/app/views/layouts/main.php';
@@ -146,44 +130,50 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Fixed Date Parser) ---
+    // --- IMPORT (Fixed Date Logic & Pagination Support) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
             $file = fopen($_FILES['csv_file']['tmp_name'], 'r');
-            fgetcsv($file); // Skip Header
+            
+            // Skip Header
+            fgetcsv($file); 
 
             $success = 0;
+            $rowNum = 1;
+            
+            // Get override customer
             $overrideCustomer = !empty($_POST['import_customer_name']) ? $_POST['import_customer_name'] : null;
 
             $db->beginTransaction();
             try {
                 while (($row = fgetcsv($file)) !== FALSE) {
+                    $rowNum++;
                     
-                    // --- 1. DATE FIX (Handles 12/27/2025 correctly) ---
+                    // --- 1. SMART DATE PARSING ---
+                    // Handles: "12/27/2025", "2025-12-27", or Excel Serial "45285"
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
-                    $finalDate = date('Y-m-d'); // Default fallback
+                    $finalDate = date('Y-m-d'); // Default fallback to Today
 
                     if (!empty($rawDate)) {
-                        // Check for standard US Date Format (MM/DD/YYYY)
-                        if (strpos($rawDate, '/') !== false) {
-                            $parts = explode('/', $rawDate);
-                            if (count($parts) == 3) {
-                                // $parts[0] = Month, $parts[1] = Day, $parts[2] = Year
-                                $finalDate = date("Y-m-d", strtotime($rawDate));
-                            }
-                        } 
-                        // Check for Excel Serial Number
-                        elseif (is_numeric($rawDate)) {
+                        if (is_numeric($rawDate)) {
+                            // Handle Excel Serial Date
                             $unixDate = ($rawDate - 25569) * 86400;
                             $finalDate = gmdate("Y-m-d", $unixDate);
+                        } else {
+                            // Handle Standard Date Text (MM/DD/YYYY)
+                            $ts = strtotime($rawDate);
+                            if ($ts !== false) {
+                                $finalDate = date('Y-m-d', $ts);
+                            }
                         }
                     }
 
-                    // --- 2. MAP COLUMNS ---
+                    // --- 2. COLUMNS ---
                     $drNum = isset($row[6]) ? trim($row[6]) : '';
                     if (empty($drNum)) continue; 
 
+                    // Customer & GR (Col M = Index 12)
                     $custName = $overrideCustomer ?? ($row[9] ?? 'Unknown');
                     $grNum = isset($row[12]) ? trim($row[12]) : ''; 
 
@@ -193,8 +183,14 @@ class DrController {
                     if (!$dr) {
                         $stmt = $db->prepare("INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, gr_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)");
                         $stmt->execute([
-                            $drNum, $finalDate, $custName, 
-                            $row[8] ?? '', $row[11] ?? '', $grNum, 'PHP', 1
+                            $drNum, 
+                            $finalDate, // Uses the parsed date
+                            $custName, 
+                            $row[8] ?? '', 
+                            $row[11] ?? '', 
+                            $grNum, 
+                            'PHP', 
+                            1 // Force VAT Inc
                         ]);
                         $drId = $db->lastInsertId();
                         $success++;
@@ -205,6 +201,7 @@ class DrController {
                     // --- 4. PRICE LOGIC ---
                     $qty = floatval(str_replace(',', '', $row[2] ?? 0));
                     $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0)); 
+
                     $unitPrice = ($qty > 0) ? ($totalExVat / $qty) : 0;
                     $finalAmount = $totalExVat * 1.12; 
 
@@ -219,7 +216,7 @@ class DrController {
 
             } catch (Exception $e) { 
                 $db->rollBack(); 
-                die("Import Failed: " . $e->getMessage()); 
+                die("Import Failed at Row $rowNum: " . $e->getMessage()); 
             }
             header("Location: /revenue/dr");
         }
@@ -230,8 +227,8 @@ class DrController {
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="dr_template.csv"');
         $output = fopen('php://output', 'w');
-        fputcsv($output, ['Item Code', 'Description', 'Qty', 'UOM', 'Currency', 'Price', 'Reference Doc (DR)', 'GR Date (MM/DD/YYYY)', 'Plant Code', 'Plant Name', 'Vat Inc (1=Yes)', 'PO Number', 'GR Number']);
-        fputcsv($output, ['ITEM001', 'Sample Item', '10', 'PCS', 'PHP', '100.00', 'DR-2023-001', '12/25/2025', 'PL01', 'Manila Plant', '1', 'PO-999', 'GR-888']);
+        fputcsv($output, ['Item Code', 'Description', 'Qty', 'UOM', 'GR Number', 'Price', 'DR Number', 'Date (MM/DD/YYYY)', 'Plant Code', 'Customer', 'Vat Inc (1=Yes)', 'PO Number', 'GR Number']);
+        fputcsv($output, ['ITEM001', 'Sample Item', '10', 'PCS', 'GR-888', '100.00', 'DR-2023-001', date('m/d/Y'), 'PL01', 'Customer Name', '1', 'PO-999', 'GR-999']);
         fclose($output);
         exit();
     }
@@ -240,19 +237,11 @@ class DrController {
         $db = Database::getInstance();
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="dr_export.csv"');
-        
         $output = fopen('php://output', 'w');
         fputcsv($output, ['Item Code', 'Description', 'Qty', 'UOM', 'Currency', 'Price', 'Reference Doc', 'Date', 'Plant Code', 'Customer', 'Vat Inc', 'PO Number', 'GR Number', 'Status']);
-
-        $sql = "SELECT l.item_code, l.description, l.quantity, l.uom, d.currency, l.price, d.dr_number, d.date, d.plant_code, d.customer_name, d.is_vat_inc, d.po_number, d.gr_number, d.status 
-                FROM delivery_receipts d JOIN dr_lines l ON d.id = l.dr_id";
+        $sql = "SELECT l.item_code, l.description, l.quantity, l.uom, d.currency, l.price, d.dr_number, d.date, d.plant_code, d.customer_name, d.is_vat_inc, d.po_number, d.gr_number, d.status FROM delivery_receipts d JOIN dr_lines l ON d.id = l.dr_id";
         $rows = $db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Fix Date Format in Export to match user request (MM/DD/YYYY)
-        foreach ($rows as $row) {
-             $row['date'] = date('m/d/Y', strtotime($row['date'])); 
-             fputcsv($output, $row);
-        }
+        foreach ($rows as $row) fputcsv($output, $row);
         fclose($output);
         exit();
     }
