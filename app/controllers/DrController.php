@@ -24,10 +24,12 @@ class DrController {
         if ($fromDate) { $where .= " AND d.date >= ?"; $params[] = $fromDate; }
         if ($toDate) { $where .= " AND d.date <= ?"; $params[] = $toDate; }
 
+        // --- FIX PAGINATION COUNT ---
         $countSql = "SELECT COUNT(*) as total FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
-        $totalRecords = $stmtCount->fetch()['total'];
+        // Force FETCH_ASSOC to ensure we get the array key 'total'
+        $totalRecords = $stmtCount->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
         $totalPages = ceil($totalRecords / $limit);
 
         $sql = "SELECT l.*, 
@@ -130,7 +132,7 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Fixed Date Parsing) ---
+    // --- IMPORT (Fixed Date Priority) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -150,22 +152,29 @@ class DrController {
                 while (($row = fgetcsv($file)) !== FALSE) {
                     $rowNum++;
                     
-                    // --- 1. SMART DATE PARSING ---
-                    // Handles: "12/27/2025", "2025-12-27", or Excel Serial "45285"
+                    // --- 1. STRICT DATE FIX ---
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
-                    $finalDate = date('Y-m-d'); // Default fallback
+                    $finalDate = date('Y-m-d'); // Fallback
 
                     if (!empty($rawDate)) {
-                        // Check if it's numeric (Excel Serial Date)
-                        if (is_numeric($rawDate)) {
+                        // Priority 1: US Format MM/DD/YYYY (e.g. 12/27/2025)
+                        $d = DateTime::createFromFormat('m/d/Y', $rawDate);
+                        
+                        // Priority 2: Standard Format YYYY-MM-DD
+                        if (!$d) {
+                             $d = DateTime::createFromFormat('Y-m-d', $rawDate);
+                        }
+
+                        if ($d) {
+                            $finalDate = $d->format('Y-m-d');
+                        } elseif (is_numeric($rawDate)) {
+                            // Priority 3: Excel Serial Number
                             $unixDate = ($rawDate - 25569) * 86400;
                             $finalDate = gmdate("Y-m-d", $unixDate);
                         } else {
-                            // Use PHP's smart parser (Handles / and - automatically)
+                            // Priority 4: Last Resort
                             $ts = strtotime($rawDate);
-                            if ($ts !== false) {
-                                $finalDate = date('Y-m-d', $ts);
-                            }
+                            if ($ts) $finalDate = date('Y-m-d', $ts);
                         }
                     }
 
@@ -173,7 +182,6 @@ class DrController {
                     $drNum = isset($row[6]) ? trim($row[6]) : '';
                     if (empty($drNum)) continue; 
 
-                    // Customer & GR (Col M = Index 12)
                     $custName = $overrideCustomer ?? ($row[9] ?? 'Unknown');
                     $grNum = isset($row[12]) ? trim($row[12]) : ''; 
 
@@ -184,7 +192,7 @@ class DrController {
                         $stmt = $db->prepare("INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, gr_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)");
                         $stmt->execute([
                             $drNum, 
-                            $finalDate, // Uses the parsed date
+                            $finalDate, 
                             $custName, 
                             $row[8] ?? '', 
                             $row[11] ?? '', 

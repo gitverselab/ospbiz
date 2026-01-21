@@ -147,16 +147,11 @@
     
     <div class="flex gap-2">
         <?php 
-            // Build Base URL safely
+            // Build URL safely
             $params = $_GET; 
-            unset($params['page']); // Remove current page from params
+            unset($params['page']); 
+            $baseUrl = '?' . http_build_query($params) . '&page=';
             
-            // Rebuild query string (e.g., search=abc&limit=10)
-            $queryString = http_build_query($params);
-            
-            // If query string exists, append &page=, otherwise append ?page=
-            $baseUrl = $queryString ? '?' . $queryString . '&page=' : '?page=';
-
             $currPage = (int)($filters['page'] ?? 1);
             $maxPage = (int)($filters['total_pages'] ?? 1);
         ?>
@@ -166,7 +161,7 @@
                 &laquo; Previous
             </a>
         <?php else: ?>
-            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed">
+            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed select-none">
                 &laquo; Previous
             </span>
         <?php endif; ?>
@@ -176,7 +171,7 @@
                 Next &raquo;
             </a>
         <?php else: ?>
-            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed">
+            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed select-none">
                 Next &raquo;
             </span>
         <?php endif; ?>
