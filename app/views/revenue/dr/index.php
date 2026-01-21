@@ -147,36 +147,32 @@
     
     <div class="flex gap-2">
         <?php 
-            // Build Base URL safely
+            // Build Base URL for Pagination
             $params = $_GET; 
-            unset($params['page']); // Remove current page from params
-            
-            // Rebuild query string (e.g., search=abc&limit=10)
+            unset($params['page']); 
             $queryString = http_build_query($params);
-            
-            // If query string exists, append &page=, otherwise append ?page=
             $baseUrl = $queryString ? '?' . $queryString . '&page=' : '?page=';
-
+            
             $currPage = (int)($filters['page'] ?? 1);
             $maxPage = (int)($filters['total_pages'] ?? 1);
         ?>
 
         <?php if ($currPage > 1): ?>
-            <a href="<?= $baseUrl . ($currPage - 1) ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50 transition">
+            <a href="<?= $baseUrl . ($currPage - 1) ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50 shadow-sm transition">
                 &laquo; Previous
             </a>
         <?php else: ?>
-            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed">
+            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed select-none">
                 &laquo; Previous
             </span>
         <?php endif; ?>
 
         <?php if ($currPage < $maxPage): ?>
-            <a href="<?= $baseUrl . ($currPage + 1) ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50 transition">
+            <a href="<?= $baseUrl . ($currPage + 1) ?>" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50 shadow-sm transition">
                 Next &raquo;
             </a>
         <?php else: ?>
-            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed">
+            <span class="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-400 rounded text-sm cursor-not-allowed select-none">
                 Next &raquo;
             </span>
         <?php endif; ?>
