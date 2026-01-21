@@ -130,7 +130,7 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Fixed Date Logic & Pagination Support) ---
+    // --- IMPORT (Fixed Date Parsing) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -153,15 +153,15 @@ class DrController {
                     // --- 1. SMART DATE PARSING ---
                     // Handles: "12/27/2025", "2025-12-27", or Excel Serial "45285"
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
-                    $finalDate = date('Y-m-d'); // Default fallback to Today
+                    $finalDate = date('Y-m-d'); // Default fallback
 
                     if (!empty($rawDate)) {
+                        // Check if it's numeric (Excel Serial Date)
                         if (is_numeric($rawDate)) {
-                            // Handle Excel Serial Date
                             $unixDate = ($rawDate - 25569) * 86400;
                             $finalDate = gmdate("Y-m-d", $unixDate);
                         } else {
-                            // Handle Standard Date Text (MM/DD/YYYY)
+                            // Use PHP's smart parser (Handles / and - automatically)
                             $ts = strtotime($rawDate);
                             if ($ts !== false) {
                                 $finalDate = date('Y-m-d', $ts);
