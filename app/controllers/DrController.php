@@ -24,21 +24,16 @@ class DrController {
         if ($fromDate) { $where .= " AND d.date >= ?"; $params[] = $fromDate; }
         if ($toDate) { $where .= " AND d.date <= ?"; $params[] = $toDate; }
 
-        // --- PAGINATION FIX (FAIL-SAFE) ---
-        // 1. Give the count a specific name: 'total_count'
-        // 2. Fetch as an Associative Array to guarantee we get the number
-        $countSql = "SELECT COUNT(*) as total_count FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
+        // --- 1. COUNT RECORDS (For Pagination) ---
+        $countSql = "SELECT COUNT(*) FROM dr_lines l JOIN delivery_receipts d ON l.dr_id = d.id WHERE $where";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
-        $row = $stmtCount->fetch(PDO::FETCH_ASSOC);
+        $totalRecords = $stmtCount->fetchColumn(); // Get the raw number
         
-        // Force integer cast. If row is false, default to 0.
-        $totalRecords = ($row && isset($row['total_count'])) ? (int)$row['total_count'] : 0;
-
         $totalPages = ceil($totalRecords / $limit);
         if ($totalPages < 1) $totalPages = 1;
 
-        // FETCH DATA
+        // --- 2. FETCH DATA ---
         $sql = "SELECT l.*, 
                        d.id as dr_id, d.dr_number, d.date, d.customer_name, 
                        d.po_number, d.status, d.currency, d.is_vat_inc
@@ -54,7 +49,18 @@ class DrController {
 
         try { $customers = $db->query("SELECT * FROM customers ORDER BY name")->fetchAll(); } catch (Exception $e) { $customers = []; }
 
-        $filters = compact('search', 'customer', 'fromDate', 'toDate', 'limit', 'page', 'totalPages', 'totalRecords');
+        // --- FIX: Map variable names explicitly for the View ---
+        $filters = [
+            'search' => $search,
+            'customer' => $customer,
+            'from' => $fromDate,
+            'to' => $toDate,
+            'limit' => $limit,
+            'page' => $page,
+            'total_pages' => $totalPages,      // snake_case for View
+            'total_records' => $totalRecords   // snake_case for View
+        ];
+
         $pageTitle = "DR Management";
         $childView = ROOT_PATH . '/app/views/revenue/dr/index.php';
         require_once ROOT_PATH . '/app/views/layouts/main.php';
@@ -137,14 +143,12 @@ class DrController {
         }
     }
 
-    // --- IMPORT (With Safe Date & Price Fixes) ---
+    // --- IMPORT (Enhanced Date Parser) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
             $file = fopen($_FILES['csv_file']['tmp_name'], 'r');
-            
-            // Skip Header
-            fgetcsv($file); 
+            fgetcsv($file); // Skip Header
 
             $success = 0;
             $rowNum = 1;
@@ -163,7 +167,7 @@ class DrController {
                     if (!empty($rawDate)) {
                         $cleanDate = preg_replace('/[^0-9\/\-]/', '', $rawDate);
                         
-                        // Try strict formats first
+                        // Try standard formats first
                         $d = DateTime::createFromFormat('m/d/Y', $cleanDate);
                         if (!$d) $d = DateTime::createFromFormat('n/j/Y', $cleanDate);
                         if (!$d) $d = DateTime::createFromFormat('Y-m-d', $cleanDate);
@@ -171,9 +175,11 @@ class DrController {
                         if ($d) {
                             $finalDate = $d->format('Y-m-d');
                         } elseif (is_numeric($cleanDate)) {
+                            // Excel Serial Number
                             $unixDate = ($cleanDate - 25569) * 86400;
                             $finalDate = gmdate("Y-m-d", $unixDate);
                         } else {
+                            // Last resort
                             $ts = strtotime($cleanDate);
                             if ($ts) $finalDate = date('Y-m-d', $ts);
                         }
@@ -191,7 +197,10 @@ class DrController {
                     
                     if (!$dr) {
                         $stmt = $db->prepare("INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, gr_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)");
-                        $stmt->execute([$drNum, $finalDate, $custName, $row[8] ?? '', $row[11] ?? '', $grNum, 'PHP', 1]);
+                        $stmt->execute([
+                            $drNum, $finalDate, $custName, 
+                            $row[8] ?? '', $row[11] ?? '', $grNum, 'PHP', 1
+                        ]);
                         $drId = $db->lastInsertId();
                         $success++;
                     } else {
