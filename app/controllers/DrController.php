@@ -130,19 +130,19 @@ class DrController {
         }
     }
 
-    // --- IMPORT (Fixed Date 0014 Error & VAT Calculation) ---
+    // --- IMPORT (Fixed Date, GR, and Price) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
             $file = fopen($_FILES['csv_file']['tmp_name'], 'r');
             
-            // Skip Header Row
+            // Skip Header
             fgetcsv($file); 
 
             $success = 0;
             $rowNum = 1;
             
-            // Get override customer from Modal
+            // Get override customer
             $overrideCustomer = !empty($_POST['import_customer_name']) ? $_POST['import_customer_name'] : null;
 
             $db->beginTransaction();
@@ -150,27 +150,22 @@ class DrController {
                 while (($row = fgetcsv($file)) !== FALSE) {
                     $rowNum++;
                     
-                    // --- 1. ROBUST DATE FIX (Force MM/DD/YYYY) ---
+                    // --- 1. ROBUST DATE FIX ---
+                    // This handles 12/27/2025, 2025-12-27, and Excel Serial Numbers
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
                     $finalDate = date('Y-m-d'); // Default to today
 
                     if (!empty($rawDate)) {
-                        // Check for slash format like 12/27/2025
-                        if (strpos($rawDate, '/') !== false) {
-                            $parts = explode('/', $rawDate);
-                            if (count($parts) == 3) {
-                                // Assume MM/DD/YYYY
-                                $m = $parts[0];
-                                $d = $parts[1];
-                                $y = $parts[2];
-                                // Fix 2-digit years if necessary, though CSV usually has 4
-                                if (strlen($y) == 2) $y = "20" . $y; 
-                                $finalDate = "$y-$m-$d";
-                            }
+                        // Check if it's numeric (Excel Serial Date like 45285)
+                        if (is_numeric($rawDate)) {
+                            $unixDate = ($rawDate - 25569) * 86400;
+                            $finalDate = gmdate("Y-m-d", $unixDate);
                         } else {
-                            // Fallback for YYYY-MM-DD
-                            $d = DateTime::createFromFormat('Y-m-d', $rawDate);
-                            if ($d) $finalDate = $d->format('Y-m-d');
+                            // Try standard text parsing (Works best for 12/27/2025)
+                            $ts = strtotime($rawDate);
+                            if ($ts !== false) {
+                                $finalDate = date('Y-m-d', $ts);
+                            }
                         }
                     }
 
@@ -178,27 +173,24 @@ class DrController {
                     $drNum = isset($row[6]) ? trim($row[6]) : '';
                     if (empty($drNum)) continue; 
 
-                    // Customer
+                    // Customer & GR
                     $custName = $overrideCustomer ?? ($row[9] ?? 'Unknown');
-                    
-                    // GR Number: Column M (Index 12)
-                    $grNum = isset($row[12]) ? trim($row[12]) : '';
+                    $grNum = isset($row[12]) ? trim($row[12]) : ''; // Col M (Index 12)
 
-                    // --- 3. CREATE HEADER ---
+                    // --- 3. HEADER ---
                     $dr = $db->query("SELECT id FROM delivery_receipts WHERE dr_number = '$drNum'")->fetch();
                     
                     if (!$dr) {
                         $stmt = $db->prepare("INSERT INTO delivery_receipts (company_id, dr_number, date, customer_name, plant_code, po_number, gr_number, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)");
-                        // Force is_vat_inc = 1 so the system knows the total stored is VAT Inclusive
                         $stmt->execute([
                             $drNum, 
                             $finalDate, 
                             $custName, 
                             $row[8] ?? '', 
                             $row[11] ?? '', 
-                            $grNum,         
+                            $grNum, 
                             'PHP', 
-                            1               
+                            1 // Force VAT Inc
                         ]);
                         $drId = $db->lastInsertId();
                         $success++;
@@ -206,28 +198,19 @@ class DrController {
                         $drId = $dr['id'];
                     }
 
-                    // --- 4. PRICE LOGIC (Always add 12% VAT) ---
+                    // --- 4. PRICE & VAT LOGIC ---
                     $qty = floatval(str_replace(',', '', $row[2] ?? 0));
-                    $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0)); // Col F (72984)
+                    $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0)); 
 
                     // Unit Price (Ex Vat)
                     $unitPrice = ($qty > 0) ? ($totalExVat / $qty) : 0;
-
+                    
                     // Final Amount (Inc Vat) = ExVat * 1.12
                     $finalAmount = $totalExVat * 1.12; 
 
                     // --- 5. INSERT LINE ---
                     $db->prepare("INSERT INTO dr_lines (dr_id, item_code, description, quantity, uom, price, amount, gr_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-                       ->execute([
-                           $drId, 
-                           $row[0] ?? '', // Code
-                           $row[1] ?? '', // Desc
-                           $qty, 
-                           $row[3] ?? '', // UOM
-                           $unitPrice,    // Saved as Unit Price (Ex Vat)
-                           $finalAmount,  // Saved as Total Amount (Inc Vat)
-                           $grNum         // GR Number on Line
-                       ]);
+                       ->execute([$drId, $row[0] ?? '', $row[1] ?? '', $qty, $row[3] ?? '', $unitPrice, $finalAmount, $grNum]);
                 }
                 $db->commit();
                 
