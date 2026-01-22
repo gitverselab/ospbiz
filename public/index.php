@@ -233,11 +233,26 @@ elseif ($uri === '/revenue/rts') {
 elseif ($uri === '/revenue/rts/create') {
     $c = new RtsController(); $c->create();
 }
+elseif ($uri === '/revenue/rts/store') {
+    $c = new RtsController(); $c->store();
+}
+elseif ($uri === '/revenue/rts/edit') {
+    $c = new RtsController(); $c->edit();
+}
+elseif ($uri === '/revenue/rts/update') {
+    $c = new RtsController(); $c->update();
+}
+elseif ($uri === '/revenue/rts/delete') {
+    $c = new RtsController(); $c->delete();
+}
 elseif ($uri === '/revenue/rts/import') {
     $c = new RtsController(); $c->import();
 }
 elseif ($uri === '/revenue/rts/template') {
     $c = new RtsController(); $c->template();
+}
+elseif ($uri === '/revenue/rts/export') {
+    $c = new RtsController(); $c->export();
 }
 // --- REVENUE: SALES INVOICES ---
 elseif ($uri === '/revenue/sales') {
