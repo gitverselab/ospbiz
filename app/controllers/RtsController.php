@@ -26,24 +26,18 @@ class RtsController {
             $where .= " AND r.plant_name LIKE ?";
             $params[] = "%$plant%";
         }
-        if ($fromDate) {
-            $where .= " AND r.date >= ?";
-            $params[] = $fromDate;
-        }
-        if ($toDate) {
-            $where .= " AND r.date <= ?";
-            $params[] = $toDate;
-        }
+        if ($fromDate) { $where .= " AND r.date >= ?"; $params[] = $fromDate; }
+        if ($toDate) { $where .= " AND r.date <= ?"; $params[] = $toDate; }
 
-        // 3. PAGINATION COUNTS
-        $countSql = "SELECT COUNT(*) as total 
-                     FROM rts_lines l 
-                     JOIN rts_records r ON l.rts_id = r.id 
-                     WHERE $where";
+        // 3. PAGINATION FIX (FAIL-SAFE COUNT)
+        $countSql = "SELECT COUNT(l.id) as total_count FROM rts_lines l JOIN rts_records r ON l.rts_id = r.id WHERE $where";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
-        $totalRecords = $stmtCount->fetch()['total'];
+        $row = $stmtCount->fetch(PDO::FETCH_ASSOC);
+        $totalRecords = ($row && isset($row['total_count'])) ? (int)$row['total_count'] : 0;
+
         $totalPages = ceil($totalRecords / $limit);
+        if ($totalPages < 1) $totalPages = 1;
 
         // 4. FETCH DATA
         $sql = "SELECT l.*, r.rd_number, r.date, r.plant_name, r.plant_code, r.po_number, r.gr_number, r.status, r.currency, r.is_vat_inc
@@ -58,13 +52,16 @@ class RtsController {
         $rts = $stmt->fetchAll();
 
         // 5. Plant Dropdown Data
-        $plants = $db->query("SELECT DISTINCT plant_name FROM rts_records ORDER BY plant_name")->fetchAll();
+        try {
+            $plants = $db->query("SELECT DISTINCT plant_name FROM rts_records ORDER BY plant_name")->fetchAll();
+        } catch (Exception $e) { $plants = []; }
 
         $filters = [
             'search' => $search, 'plant' => $plant, 
             'from' => $fromDate, 'to' => $toDate,
             'limit' => $limit, 'page' => $page, 
-            'total_pages' => $totalPages, 'total_records' => $totalRecords
+            'total_pages' => $totalPages, 
+            'total_records' => $totalRecords 
         ];
 
         $pageTitle = "RTS Management";
@@ -122,32 +119,62 @@ class RtsController {
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="rts_template.csv"');
         $output = fopen('php://output', 'w');
-        fputcsv($output, ['Item Code', 'Description', 'Qty', 'UOM', 'Currency', 'Price', 'RD Number', 'Date (YYYY-MM-DD)', 'Plant Code', 'Plant Name', 'Vat Inc (1=Yes)', 'PO Number', 'Orig GR Number', 'Ref Doc']);
-        fputcsv($output, ['RET001', 'Damaged Goods', '5', 'PCS', 'PHP', '100.00', 'RD-2023-001', date('Y-m-d'), 'PL01', 'Manila Plant', '1', 'PO-999', 'GR-ORIG-888', 'DR-REF-123']);
+        fputcsv($output, ['Item Code', 'Description', 'Qty', 'UOM', 'Currency', 'Price', 'RD Number', 'Date (MM/DD/YYYY)', 'Plant Code', 'Plant Name', 'Vat Inc (1=Yes)', 'PO Number', 'Orig GR Number', 'Ref Doc']);
+        fputcsv($output, ['RET001', 'Damaged Goods', '5', 'PCS', 'PHP', '100.00', 'RD-2023-001', date('m/d/Y'), 'PL01', 'Manila Plant', '1', 'PO-999', 'GR-ORIG-888', 'DR-REF-123']);
         fclose($output);
         exit();
     }
 
-    // --- CSV IMPORT ---
+    // --- CSV IMPORT (Robust Date Fix) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
             $file = fopen($_FILES['csv_file']['tmp_name'], 'r');
-            fgetcsv($file); 
+            fgetcsv($file); // Skip Header
 
             $db->beginTransaction();
             try {
                 while (($row = fgetcsv($file)) !== FALSE) {
+                    
+                    // --- DATE CLEANER (Same as DR) ---
+                    $rawDate = isset($row[7]) ? trim($row[7]) : '';
+                    $finalDate = null;
+
+                    if (!empty($rawDate)) {
+                        // Check numeric (Excel Serial)
+                        if (is_numeric($rawDate)) {
+                            $unixDate = ($rawDate - 25569) * 86400;
+                            $finalDate = gmdate("Y-m-d", $unixDate);
+                        } else {
+                            // Text Date: Remove non-date chars
+                            $cleanDate = preg_replace('/[^0-9\/\-]/', '', $rawDate);
+                            
+                            // Try MM/DD/YYYY
+                            $d = DateTime::createFromFormat('m/d/Y', $cleanDate);
+                            if (!$d) $d = DateTime::createFromFormat('n/j/Y', $cleanDate);
+                            if (!$d) $d = DateTime::createFromFormat('Y-m-d', $cleanDate);
+
+                            if ($d) {
+                                $finalDate = $d->format('Y-m-d');
+                            } else {
+                                $ts = strtotime($cleanDate);
+                                if ($ts) $finalDate = date('Y-m-d', $ts);
+                            }
+                        }
+                    }
+                    if (!$finalDate) $finalDate = date('Y-m-d'); // Default to Today
+
+                    // Check Header
                     $rts = $db->query("SELECT id FROM rts_records WHERE rd_number = '{$row[6]}'")->fetch();
                     if (!$rts) {
-                        // Auto-set status to 'received'
                         $stmt = $db->prepare("INSERT INTO rts_records (company_id, rd_number, date, plant_code, plant_name, po_number, gr_number, reference_doc, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, 'received', ?, ?)");
-                        $stmt->execute([$row[6], $row[7], $row[8], $row[9], $row[11], $row[12], $row[13], $row[4], $row[10]]);
+                        $stmt->execute([$row[6], $finalDate, $row[8], $row[9], $row[11], $row[12], $row[13], $row[4], $row[10]]);
                         $rtsId = $db->lastInsertId();
                     } else {
                         $rtsId = $rts['id'];
                     }
 
+                    // Lines
                     $amount = floatval($row[2]) * floatval($row[5]);
                     $db->prepare("INSERT INTO rts_lines (rts_id, item_code, description, quantity, uom, price, amount) VALUES (?, ?, ?, ?, ?, ?, ?)")
                        ->execute([$rtsId, $row[0], $row[1], $row[2], $row[3], $row[5], $amount]);
