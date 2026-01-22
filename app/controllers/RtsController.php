@@ -30,7 +30,7 @@ class RtsController {
         if ($toDate) { $where .= " AND r.date <= ?"; $params[] = $toDate; }
 
         // 3. PAGINATION FIX (FAIL-SAFE COUNT)
-        $countSql = "SELECT COUNT(l.id) as total_count FROM rts_lines l JOIN rts_records r ON l.rts_id = r.id WHERE $where";
+        $countSql = "SELECT COUNT(*) as total_count FROM rts_lines l JOIN rts_records r ON l.rts_id = r.id WHERE $where";
         $stmtCount = $db->prepare($countSql);
         $stmtCount->execute($params);
         $row = $stmtCount->fetch(PDO::FETCH_ASSOC);
@@ -125,7 +125,7 @@ class RtsController {
         exit();
     }
 
-    // --- CSV IMPORT (Robust Date Fix) ---
+    // --- CSV IMPORT (Fixed Columns & Date) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -136,20 +136,16 @@ class RtsController {
             try {
                 while (($row = fgetcsv($file)) !== FALSE) {
                     
-                    // --- DATE CLEANER (Same as DR) ---
+                    // --- DATE FIX ---
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
                     $finalDate = null;
 
                     if (!empty($rawDate)) {
-                        // Check numeric (Excel Serial)
                         if (is_numeric($rawDate)) {
                             $unixDate = ($rawDate - 25569) * 86400;
                             $finalDate = gmdate("Y-m-d", $unixDate);
                         } else {
-                            // Text Date: Remove non-date chars
                             $cleanDate = preg_replace('/[^0-9\/\-]/', '', $rawDate);
-                            
-                            // Try MM/DD/YYYY
                             $d = DateTime::createFromFormat('m/d/Y', $cleanDate);
                             if (!$d) $d = DateTime::createFromFormat('n/j/Y', $cleanDate);
                             if (!$d) $d = DateTime::createFromFormat('Y-m-d', $cleanDate);
@@ -162,22 +158,42 @@ class RtsController {
                             }
                         }
                     }
-                    if (!$finalDate) $finalDate = date('Y-m-d'); // Default to Today
+                    if (!$finalDate) $finalDate = date('Y-m-d');
 
                     // Check Header
+                    // Row 6 = RD Number (Column G)
                     $rts = $db->query("SELECT id FROM rts_records WHERE rd_number = '{$row[6]}'")->fetch();
+                    
                     if (!$rts) {
+                        // --- COLUMN MAPPING FIX ---
+                        // Row 13 (Index 13) is Column N "Ref Doc"
+                        // Row 12 (Index 12) is Column M "Orig GR Number"
                         $stmt = $db->prepare("INSERT INTO rts_records (company_id, rd_number, date, plant_code, plant_name, po_number, gr_number, reference_doc, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, 'received', ?, ?)");
-                        $stmt->execute([$row[6], $finalDate, $row[8], $row[9], $row[11], $row[12], $row[13], $row[4], $row[10]]);
+                        
+                        $stmt->execute([
+                            $row[6],        // RD Number
+                            $finalDate,     // Date
+                            $row[8],        // Plant Code
+                            $row[9],        // Plant Name
+                            $row[11],       // PO Number
+                            $row[12],       // GR Number (Col M)
+                            $row[13] ?? '', // Reference Doc (Col N)
+                            $row[4],        // Currency
+                            $row[10]        // Vat Inc
+                        ]);
                         $rtsId = $db->lastInsertId();
                     } else {
                         $rtsId = $rts['id'];
                     }
 
                     // Lines
-                    $amount = floatval($row[2]) * floatval($row[5]);
+                    // Price is Row 5 (Col F), Qty is Row 2 (Col C)
+                    $price = floatval(str_replace(',', '', $row[5]));
+                    $qty = floatval(str_replace(',', '', $row[2]));
+                    $amount = $qty * $price;
+
                     $db->prepare("INSERT INTO rts_lines (rts_id, item_code, description, quantity, uom, price, amount) VALUES (?, ?, ?, ?, ?, ?, ?)")
-                       ->execute([$rtsId, $row[0], $row[1], $row[2], $row[3], $row[5], $amount]);
+                       ->execute([$rtsId, $row[0], $row[1], $qty, $row[3], $price, $amount]);
                 }
                 $db->commit();
             } catch (Exception $e) { $db->rollBack(); }
