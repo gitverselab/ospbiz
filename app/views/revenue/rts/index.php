@@ -65,11 +65,12 @@
                 <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Qty</th>
                 <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Total</th>
                 <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Actions</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
             <?php if(empty($rts)): ?>
-                <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500 italic">No return records found.</td></tr>
+                <tr><td colspan="8" class="px-6 py-8 text-center text-gray-500 italic">No return records found.</td></tr>
             <?php else: ?>
                 <?php foreach($rts as $r): 
                     $incVat = $r['is_vat_inc'] ? $r['amount'] : ($r['amount'] * 1.12);
@@ -102,6 +103,17 @@
                             <?= ($r['status'] == 'received') ? 'bg-green-500' : 'bg-orange-500' ?>">
                             <?= ucfirst($r['status']) ?>
                         </span>
+                    </td>
+                    
+                    <td class="px-6 py-4 text-center text-sm">
+                        <div class="flex flex-col gap-1 items-center">
+                            <a href="/revenue/rts/edit?id=<?= $r['rts_id'] ?>" class="text-blue-600 hover:text-blue-800 font-medium">Edit</a>
+                            
+                            <form action="/revenue/rts/delete" method="POST" onsubmit="return confirm('Delete this RTS record?');">
+                                <input type="hidden" name="id" value="<?= $r['rts_id'] ?>">
+                                <button type="submit" class="text-red-500 hover:text-red-700 font-medium text-xs">Delete</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 <?php endforeach; ?>
