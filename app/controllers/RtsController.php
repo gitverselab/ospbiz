@@ -114,18 +114,19 @@ class RtsController {
         }
     }
 
-    // --- DOWNLOAD TEMPLATE ---
+    // --- DOWNLOAD TEMPLATE (Updated Columns) ---
     public function template() {
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="rts_template.csv"');
         $output = fopen('php://output', 'w');
-        fputcsv($output, ['Item Code', 'Description', 'Qty', 'UOM', 'Currency', 'Price', 'RD Number', 'Date (MM/DD/YYYY)', 'Plant Code', 'Plant Name', 'Vat Inc (1=Yes)', 'PO Number', 'Orig GR Number', 'Ref Doc']);
-        fputcsv($output, ['RET001', 'Damaged Goods', '5', 'PCS', 'PHP', '100.00', 'RD-2023-001', date('m/d/Y'), 'PL01', 'Manila Plant', '1', 'PO-999', 'GR-ORIG-888', 'DR-REF-123']);
+        // Updated Headers: Ref Doc is now Col M (12), GR Number is Col N (13)
+        fputcsv($output, ['Item Code', 'Description', 'Qty', 'UOM', 'Currency', 'Price', 'RD Number', 'Date (MM/DD/YYYY)', 'Plant Code', 'Plant Name', 'Vat Inc (1=Yes)', 'PO Number', 'Reference Doc', 'Orig GR Number']);
+        fputcsv($output, ['RET001', 'Damaged Goods', '5', 'PCS', 'PHP', '100.00', 'RD-2023-001', date('m/d/Y'), 'PL01', 'Manila Plant', '1', 'PO-999', 'DR-REF-123', 'GR-ORIG-888']);
         fclose($output);
         exit();
     }
 
-    // --- CSV IMPORT (Fixed Columns & Date) ---
+    // --- CSV IMPORT (Fixed Column Mapping & Date) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -160,14 +161,17 @@ class RtsController {
                     }
                     if (!$finalDate) $finalDate = date('Y-m-d');
 
-                    // Check Header
-                    // Row 6 = RD Number (Column G)
+                    // --- CHECK HEADER ---
+                    // Row 6 = RD Number
                     $rts = $db->query("SELECT id FROM rts_records WHERE rd_number = '{$row[6]}'")->fetch();
                     
                     if (!$rts) {
                         // --- COLUMN MAPPING FIX ---
-                        // Row 13 (Index 13) is Column N "Ref Doc"
-                        // Row 12 (Index 12) is Column M "Orig GR Number"
+                        // Row 12 (Index 12) = Reference Doc (Col M)
+                        // Row 13 (Index 13) = GR Number (Col N)
+                        $refDoc = isset($row[12]) ? trim($row[12]) : '';
+                        $grNum  = isset($row[13]) ? trim($row[13]) : '';
+
                         $stmt = $db->prepare("INSERT INTO rts_records (company_id, rd_number, date, plant_code, plant_name, po_number, gr_number, reference_doc, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, 'received', ?, ?)");
                         
                         $stmt->execute([
@@ -176,8 +180,8 @@ class RtsController {
                             $row[8],        // Plant Code
                             $row[9],        // Plant Name
                             $row[11],       // PO Number
-                            $row[12],       // GR Number (Col M)
-                            $row[13] ?? '', // Reference Doc (Col N)
+                            $grNum,         // GR Number (Col N / Index 13)
+                            $refDoc,        // Ref Doc (Col M / Index 12)
                             $row[4],        // Currency
                             $row[10]        // Vat Inc
                         ]);
@@ -186,8 +190,7 @@ class RtsController {
                         $rtsId = $rts['id'];
                     }
 
-                    // Lines
-                    // Price is Row 5 (Col F), Qty is Row 2 (Col C)
+                    // --- LINES ---
                     $price = floatval(str_replace(',', '', $row[5]));
                     $qty = floatval(str_replace(',', '', $row[2]));
                     $amount = $qty * $price;
