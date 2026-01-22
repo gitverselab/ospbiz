@@ -1,46 +1,56 @@
-<form action="/revenue/rts/store" method="POST" class="max-w-6xl mx-auto bg-white p-8 rounded-lg shadow-sm border border-gray-200">
+<?php 
+// Check if Editing
+$isEdit = isset($rts); 
+$actionUrl = $isEdit ? "/revenue/rts/update" : "/revenue/rts/store";
+?>
+
+<form action="<?= $actionUrl ?>" method="POST" class="max-w-6xl mx-auto bg-white p-8 rounded-lg shadow-sm border border-gray-200">
+    <?php if($isEdit): ?>
+        <input type="hidden" name="id" value="<?= $rts['id'] ?>">
+    <?php endif; ?>
+
     <div class="flex justify-between items-center mb-6 border-b pb-4">
-        <h2 class="text-xl font-bold text-gray-800">Record Return (RTS)</h2>
+        <h2 class="text-xl font-bold text-gray-800"><?= $isEdit ? 'Edit' : 'Create' ?> RTS Record</h2>
         <a href="/revenue/rts" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">RD Number (Return Doc)</label>
-            <input type="text" name="rd_number" class="w-full border p-2 rounded" placeholder="e.g. RD-5001" required>
+            <input type="text" name="rd_number" value="<?= $isEdit ? htmlspecialchars($rts['rd_number'] ?? '') : '' ?>" class="w-full border p-2 rounded" placeholder="e.g. RD-5001" required>
         </div>
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Return Date</label>
-            <input type="date" name="date" value="<?= date('Y-m-d') ?>" class="w-full border p-2 rounded" required>
+            <input type="date" name="date" value="<?= $isEdit ? $rts['date'] : date('Y-m-d') ?>" class="w-full border p-2 rounded" required>
         </div>
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Plant Name</label>
-            <input type="text" name="plant_name" class="w-full border p-2 rounded" placeholder="e.g. Manila Plant" required>
+            <input type="text" name="plant_name" value="<?= $isEdit ? htmlspecialchars($rts['plant_name'] ?? '') : '' ?>" class="w-full border p-2 rounded" placeholder="e.g. Manila Plant" required>
         </div>
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Plant Code</label>
-            <input type="text" name="plant_code" class="w-full border p-2 rounded" placeholder="e.g. PL01">
+            <input type="text" name="plant_code" value="<?= $isEdit ? htmlspecialchars($rts['plant_code'] ?? '') : '' ?>" class="w-full border p-2 rounded" placeholder="e.g. PL01">
         </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Original PO #</label>
-            <input type="text" name="po_number" class="w-full border p-2 rounded">
+            <input type="text" name="po_number" value="<?= $isEdit ? htmlspecialchars($rts['po_number'] ?? '') : '' ?>" class="w-full border p-2 rounded">
         </div>
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Original GR #</label>
-            <input type="text" name="gr_number" class="w-full border p-2 rounded">
+            <input type="text" name="gr_number" value="<?= $isEdit ? htmlspecialchars($rts['gr_number'] ?? '') : '' ?>" class="w-full border p-2 rounded">
         </div>
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Reference Doc</label>
-            <input type="text" name="reference_doc" class="w-full border p-2 rounded" placeholder="e.g. Original DR#">
+            <input type="text" name="reference_doc" value="<?= $isEdit ? htmlspecialchars($rts['reference_doc'] ?? '') : '' ?>" class="w-full border p-2 rounded" placeholder="e.g. Original DR#">
         </div>
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
             <select name="status" class="w-full border p-2 rounded bg-white">
-                <option value="pending">Pending</option>
-                <option value="received">Received</option>
+                <option value="pending" <?= ($isEdit && $rts['status'] == 'pending') ? 'selected' : '' ?>>Pending</option>
+                <option value="received" <?= ($isEdit && $rts['status'] == 'received') ? 'selected' : '' ?>>Received</option>
             </select>
         </div>
     </div>
@@ -49,15 +59,15 @@
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Currency</label>
             <select name="currency" class="w-full border p-2 rounded bg-white">
-                <option value="PHP">PHP</option>
-                <option value="USD">USD</option>
+                <option value="PHP" <?= ($isEdit && $rts['currency'] == 'PHP') ? 'selected' : '' ?>>PHP</option>
+                <option value="USD" <?= ($isEdit && $rts['currency'] == 'USD') ? 'selected' : '' ?>>USD</option>
             </select>
         </div>
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">VAT Included?</label>
             <select name="is_vat_inc" class="w-full border p-2 rounded bg-white">
-                <option value="1">Yes (Inc. VAT)</option>
-                <option value="0">No (Add VAT)</option>
+                <option value="1" <?= ($isEdit && $rts['is_vat_inc'] == 1) ? 'selected' : '' ?>>Yes (Inc. VAT)</option>
+                <option value="0" <?= ($isEdit && $rts['is_vat_inc'] == 0) ? 'selected' : '' ?>>No (Add VAT)</option>
             </select>
         </div>
     </div>
@@ -96,19 +106,23 @@
 </form>
 
 <script>
-function addLine() {
+// If Editing, we have lines
+const existingLines = <?= $isEdit ? json_encode($lines) : '[]' ?>;
+
+function addLine(data = null) {
     const tr = document.createElement('tr');
     tr.className = "border-b hover:bg-gray-50";
     tr.innerHTML = `
-        <td class="p-2"><input class="w-full border p-1 rounded text-sm code" placeholder="Code..." required></td>
-        <td class="p-2"><input class="w-full border p-1 rounded text-sm desc" placeholder="Description..." required></td>
-        <td class="p-2"><input class="w-full border p-1 rounded text-sm text-right qty" type="number" step="0.0001" value="1" oninput="calcRow(this)" required></td>
-        <td class="p-2"><input class="w-full border p-1 rounded text-sm text-center uom" placeholder="PCS" required></td>
-        <td class="p-2"><input class="w-full border p-1 rounded text-sm text-right price" type="number" step="0.01" value="0" oninput="calcRow(this)" required></td>
+        <td class="p-2"><input class="w-full border p-1 rounded text-sm code" value="${data ? data.item_code : ''}" placeholder="Code..." required></td>
+        <td class="p-2"><input class="w-full border p-1 rounded text-sm desc" value="${data ? data.description : ''}" placeholder="Description..." required></td>
+        <td class="p-2"><input class="w-full border p-1 rounded text-sm text-right qty" type="number" step="0.0001" value="${data ? data.quantity : 1}" oninput="calcRow(this)" required></td>
+        <td class="p-2"><input class="w-full border p-1 rounded text-sm text-center uom" value="${data ? data.uom : 'PCS'}" placeholder="PCS" required></td>
+        <td class="p-2"><input class="w-full border p-1 rounded text-sm text-right price" type="number" step="0.01" value="${data ? data.price : 0}" oninput="calcRow(this)" required></td>
         <td class="p-2 text-right font-bold text-gray-700 row-total">0.00</td>
         <td class="p-2 text-center"><button type="button" onclick="this.closest('tr').remove(); calcTotal();" class="text-red-400 hover:text-red-600"><i class="fa-solid fa-times"></i></button></td>
     `;
     document.getElementById('rtsLines').appendChild(tr);
+    calcRow(tr.querySelector('.qty'));
 }
 
 function calcRow(el) {
@@ -150,5 +164,10 @@ function prepareSubmit(e) {
     document.getElementById('linesJson').value = JSON.stringify(lines);
 }
 
-addLine();
+// Load existing lines if editing
+if (existingLines.length > 0) {
+    existingLines.forEach(line => addLine(line));
+} else {
+    addLine();
+}
 </script>
