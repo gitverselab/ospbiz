@@ -97,14 +97,22 @@
                         ?>
                         <span class="px-2 py-1 text-xs rounded-full <?= $badge ?> uppercase font-bold"><?= $inv['status'] ?></span>
                     </td>
+                    
                     <td class="px-6 py-4 text-center text-sm">
-                        <?php if($inv['status'] != 'cancelled'): ?>
-                        <form action="/revenue/sales/cancel" method="POST" onsubmit="return confirm('Are you sure? This will release the DRs attached.')">
-                            <input type="hidden" name="id" value="<?= $inv['id'] ?>">
-                            <button type="submit" class="text-red-500 hover:text-red-700 text-xs">Cancel</button>
-                        </form>
+                        <?php if($inv['status'] == 'unpaid'): ?>
+                            <form action="/revenue/sales/cancel" method="POST" onsubmit="return confirm('Are you sure? This will release the DRs attached.')">
+                                <input type="hidden" name="id" value="<?= $inv['id'] ?>">
+                                <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-bold">Cancel</button>
+                            </form>
+                        <?php elseif($inv['status'] == 'paid'): ?>
+                            <span class="text-xs text-gray-400 italic flex justify-center items-center gap-1">
+                                <i class="fa-solid fa-lock"></i> Locked
+                            </span>
+                        <?php else: ?>
+                            <span class="text-xs text-gray-400">Cancelled</span>
                         <?php endif; ?>
                     </td>
+
                 </tr>
                 <?php endforeach; ?>
             <?php endif; ?>

@@ -79,7 +79,6 @@ class SalesController {
         $openDrs = [];
         if (isset($_GET['customer'])) {
             $cust = $_GET['customer'];
-            // We sum the lines to show a preview amount for each DR
             $drSql = "SELECT d.*, 
                       (SELECT SUM(amount) FROM dr_lines WHERE dr_id = d.id) as grand_total 
                       FROM delivery_receipts d 
@@ -94,7 +93,7 @@ class SalesController {
         $activeBooklet = $db->query("SELECT * FROM invoice_booklets WHERE status='active' ORDER BY series_start ASC LIMIT 1")->fetch();
         $suggestedInv = $activeBooklet ? $activeBooklet['current_counter'] : '';
 
-        // D. Get Default Settings (Address, etc)
+        // D. Get Default Settings
         $settings = $db->query("SELECT * FROM receipt_settings LIMIT 1")->fetch();
 
         $pageTitle = "Record Sales Invoice";
@@ -102,7 +101,7 @@ class SalesController {
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
 
-    // --- 3. SAVE INVOICE (Manual Recording) ---
+    // --- 3. SAVE INVOICE ---
     public function store() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
@@ -111,8 +110,6 @@ class SalesController {
 
                 $invNum = $_POST['invoice_number'];
                 $selectedDrIds = $_POST['dr_ids'] ?? [];
-                
-                // Get the WHT amount calculated by JS (or manually edited)
                 $whtAmount = floatval($_POST['wht_amount'] ?? 0);
 
                 if (empty($selectedDrIds)) {
@@ -122,7 +119,7 @@ class SalesController {
                 // A. Validate Booklet
                 $booklet = $db->query("SELECT * FROM invoice_booklets WHERE '$invNum' BETWEEN series_start AND series_end AND status='active'")->fetch();
 
-                // B. Calculate Totals from DR Lines
+                // B. Calculate Totals
                 $placeholders = str_repeat('?,', count($selectedDrIds) - 1) . '?';
                 $linesSql = "SELECT l.*, d.dr_number, d.is_vat_inc 
                              FROM dr_lines l 
@@ -138,15 +135,11 @@ class SalesController {
 
                 foreach ($allLines as $line) {
                     $amount = floatval($line['amount']);
-                    
-                    // VAT Calculation Logic
                     if ($line['is_vat_inc']) {
-                        // Inclusive
                         $grossTotal += $amount;
                         $net = $amount / 1.12;
                         $vat = $amount - $net;
                     } else {
-                        // Exclusive
                         $net = $amount;
                         $vat = $amount * 0.12;
                         $grossTotal += ($amount + $vat);
@@ -155,11 +148,10 @@ class SalesController {
                     $vatAmount += $vat;
                 }
 
-                // C. Calculate Net Amount Receivable
-                // This matches the "Paid Amt" in your screenshot
+                // C. Net Amount Due
                 $netAmountDue = $grossTotal - $whtAmount;
 
-                // D. Insert Invoice Header
+                // D. Insert Header
                 $sql = "INSERT INTO sales_invoices (company_id, invoice_number, date, customer_name, tin, address, business_style, terms, vatable_sales, vat_amount, total_amount_due, wht_amount, net_amount_due, status) 
                         VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid')";
                 $stmt = $db->prepare($sql);
@@ -170,7 +162,7 @@ class SalesController {
                 ]);
                 $invId = $db->lastInsertId();
 
-                // E. Insert Invoice Lines
+                // E. Insert Lines
                 $insertLine = $db->prepare("INSERT INTO sales_invoice_lines (invoice_id, source_dr_number, item_code, description, quantity, uom, unit_price, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
                 foreach ($allLines as $line) {
                     $insertLine->execute([
@@ -179,7 +171,7 @@ class SalesController {
                     ]);
                 }
 
-                // F. Link DRs and Mark as Invoiced
+                // F. Link DRs
                 $linkStmt = $db->prepare("INSERT INTO dr_invoice_links (invoice_id, dr_id) VALUES (?, ?)");
                 $updateDr = $db->prepare("UPDATE delivery_receipts SET invoice_status = 'invoiced' WHERE id = ?");
 
@@ -188,7 +180,7 @@ class SalesController {
                     $updateDr->execute([$drId]);
                 }
 
-                // G. Update Booklet Counter
+                // G. Update Booklet
                 if ($booklet) {
                     $newCounter = intval($invNum) + 1;
                     $status = ($newCounter > $booklet['series_end']) ? 'full' : 'active';
@@ -197,50 +189,19 @@ class SalesController {
                            ->execute([$newCounter, $status, $booklet['id']]);
                     }
                 }
-                // ... (After linking DRs and Booklet update) ...
 
-                // H. AUTOMATIC JOURNAL ENTRY (The "Pipe")
-                // 1. Define the Accounting Entries
+                // H. Journal Entry
                 $entries = [];
-
-                // Entry 1: Debit Accounts Receivable (Total Gross Amount)
-                $entries[] = [
-                    'code' => '1200', // Ensure this matches your COA "Accounts Receivable"
-                    'desc' => "Invoice #$invNum - {$_POST['customer_name']}",
-                    'debit' => $grossTotal,
-                    'credit' => 0
-                ];
-
-                // Entry 2: Credit VAT Payable (Output VAT)
+                $entries[] = [ 'code' => '1200', 'desc' => "Invoice #$invNum - {$_POST['customer_name']}", 'debit' => $grossTotal, 'credit' => 0 ];
                 if ($vatAmount > 0) {
-                    $entries[] = [
-                        'code' => '2500', // Ensure this matches "VAT Payable"
-                        'desc' => "Output VAT - Inv #$invNum",
-                        'debit' => 0,
-                        'credit' => $vatAmount
-                    ];
+                    $entries[] = [ 'code' => '2500', 'desc' => "Output VAT - Inv #$invNum", 'debit' => 0, 'credit' => $vatAmount ];
                 }
+                $entries[] = [ 'code' => '4000', 'desc' => "Sales Revenue - Inv #$invNum", 'debit' => 0, 'credit' => $vatable ];
 
-                // Entry 3: Credit Sales Revenue (Vatable Sales)
-                $entries[] = [
-                    'code' => '4000', // Ensure this matches "Sales"
-                    'desc' => "Sales Revenue - Inv #$invNum",
-                    'debit' => 0,
-                    'credit' => $vatable
-                ];
-
-                // Call the Journal Helper
                 require_once ROOT_PATH . '/app/controllers/JournalController.php';
-                JournalController::post(
-                    $_POST['date'], 
-                    $invNum, 
-                    "Sales Invoice to {$_POST['customer_name']}", 
-                    'sales', 
-                    $invId, 
-                    $entries
-                );
+                JournalController::post($_POST['date'], $invNum, "Sales Invoice to {$_POST['customer_name']}", 'sales', $invId, $entries);
 
-                $db->commit(); // <--- Commit AFTER posting to Journal
+                $db->commit();
                 header("Location: /revenue/sales");
 
             } catch (Exception $e) {
@@ -250,16 +211,30 @@ class SalesController {
         }
     }
 
-    // --- 4. CANCEL INVOICE (Releases DRs) ---
+    // --- 4. CANCEL INVOICE (Locked if Paid) ---
     public function cancel() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
             $id = $_POST['id'];
             
+            // --- SECURITY CHECK: IS IT PAID? ---
+            $inv = $db->query("SELECT status FROM sales_invoices WHERE id = $id")->fetch();
+            
+            if (!$inv) die("Invoice not found.");
+
+            if ($inv['status'] === 'paid') {
+                // STOP THE PROCESS
+                echo "<script>
+                        alert('CRITICAL ERROR: Cannot cancel a PAID invoice.\\n\\nTo cancel this, you must first void the collection in the Remittance module to revert this invoice to UNPAID status.');
+                        window.location.href='/revenue/sales';
+                      </script>";
+                exit();
+            }
+
             try {
                 $db->beginTransaction();
 
-                // A. Set DRs back to 'uninvoiced'
+                // A. Release DRs (Set back to 'uninvoiced')
                 $db->prepare("UPDATE delivery_receipts SET invoice_status = 'uninvoiced' 
                               WHERE id IN (SELECT dr_id FROM dr_invoice_links WHERE invoice_id=?)")
                    ->execute([$id]);
@@ -267,7 +242,7 @@ class SalesController {
                 // B. Remove Links
                 $db->prepare("DELETE FROM dr_invoice_links WHERE invoice_id=?")->execute([$id]);
 
-                // C. Mark Invoice as Cancelled (Zero out amount)
+                // C. Mark Invoice as Cancelled
                 $db->prepare("UPDATE sales_invoices SET status = 'cancelled', total_amount_due = 0, vat_amount = 0, vatable_sales = 0 WHERE id=?")->execute([$id]);
                 
                 $db->commit();
@@ -280,17 +255,15 @@ class SalesController {
         }
     }
     
-    // --- 5. RECORD SPOILED INVOICE (Skipped Number) ---
+    // --- 5. RECORD SPOILED INVOICE ---
     public function storeSpoiled() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
             $invNum = $_POST['invoice_number'];
             
-            // Record a dummy invoice with status 'cancelled'
             $db->prepare("INSERT INTO sales_invoices (company_id, invoice_number, date, customer_name, status, total_amount_due) VALUES (1, ?, CURDATE(), 'SPOILED / CANCELLED', 'cancelled', 0)")
                ->execute([$invNum]);
                
-            // Update booklet counter so next suggestion is correct
             $booklet = $db->query("SELECT * FROM invoice_booklets WHERE '$invNum' BETWEEN series_start AND series_end")->fetch();
             if ($booklet) {
                  $newCounter = intval($invNum) + 1;
@@ -298,7 +271,6 @@ class SalesController {
                     $db->prepare("UPDATE invoice_booklets SET current_counter = ? WHERE id = ?")->execute([$newCounter, $booklet['id']]);
                  }
             }
-            
             header("Location: /revenue/sales");
         }
     }
