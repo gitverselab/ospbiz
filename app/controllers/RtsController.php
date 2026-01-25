@@ -38,7 +38,6 @@ class RtsController {
         if ($totalPages < 1) $totalPages = 1;
 
         // Fetch Data
-        // IMPORTANT: Select r.id as rts_id so we can link to Edit/Delete
         $sql = "SELECT l.*, 
                        r.id as rts_id, r.rd_number, r.date, r.plant_name, r.plant_code, 
                        r.po_number, r.gr_number, r.status, r.currency, r.is_vat_inc
@@ -67,30 +66,27 @@ class RtsController {
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
 
-    // --- EDIT (NEW) ---
+    // --- EDIT ---
     public function edit() {
         $db = Database::getInstance();
         $id = $_GET['id'] ?? 0;
         
-        // Fetch Header
         $rts = $db->query("SELECT * FROM rts_records WHERE id = $id")->fetch();
         if (!$rts) die("RTS Record not found");
 
-        // Fetch Lines
         $lines = $db->query("SELECT * FROM rts_lines WHERE rts_id = $id")->fetchAll();
 
         $pageTitle = "Edit RTS Record";
-        $childView = ROOT_PATH . '/app/views/revenue/rts/create.php'; // Reuses the create form
+        $childView = ROOT_PATH . '/app/views/revenue/rts/create.php'; 
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
 
     // --- STORE ---
     public function store() { $this->save(false); }
     
-    // --- UPDATE (NEW) ---
+    // --- UPDATE ---
     public function update() { $this->save(true); }
 
-    // --- SHARED SAVE LOGIC ---
     private function save($isUpdate) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
@@ -99,7 +95,6 @@ class RtsController {
 
                 if ($isUpdate) {
                     $id = $_POST['id'];
-                    // Update Header
                     $sql = "UPDATE rts_records SET rd_number=?, date=?, plant_name=?, plant_code=?, po_number=?, gr_number=?, status=?, currency=?, is_vat_inc=?, reference_doc=? WHERE id=?";
                     $stmt = $db->prepare($sql);
                     $stmt->execute([
@@ -107,12 +102,9 @@ class RtsController {
                         $_POST['plant_code'], $_POST['po_number'], $_POST['gr_number'], 
                         $_POST['status'], $_POST['currency'], $_POST['is_vat_inc'], $_POST['reference_doc'], $id
                     ]);
-                    
-                    // Clear old lines to replace them
                     $db->prepare("DELETE FROM rts_lines WHERE rts_id = ?")->execute([$id]);
                     $rtsId = $id;
                 } else {
-                    // Insert Header
                     $sql = "INSERT INTO rts_records (company_id, rd_number, date, plant_name, plant_code, po_number, gr_number, status, currency, is_vat_inc, reference_doc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                     $stmt = $db->prepare($sql);
                     $stmt->execute([
@@ -123,7 +115,6 @@ class RtsController {
                     $rtsId = $db->lastInsertId();
                 }
 
-                // Save Lines
                 $lines = json_decode($_POST['lines_json'], true);
                 if (is_array($lines)) {
                     $lineStmt = $db->prepare("INSERT INTO rts_lines (rts_id, item_code, description, quantity, uom, price, amount) VALUES (?, ?, ?, ?, ?, ?, ?)");
@@ -145,7 +136,7 @@ class RtsController {
         }
     }
 
-    // --- DELETE (NEW) ---
+    // --- DELETE ---
     public function delete() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
@@ -167,7 +158,7 @@ class RtsController {
         exit();
     }
 
-    // --- IMPORT (Fixed Date & Columns) ---
+    // --- IMPORT (Fixed Price & Date Logic) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -178,7 +169,7 @@ class RtsController {
             try {
                 while (($row = fgetcsv($file)) !== FALSE) {
                     
-                    // Date Parsing
+                    // 1. DATE FIX
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
                     $finalDate = null;
                     if (!empty($rawDate)) {
@@ -190,9 +181,8 @@ class RtsController {
                             $d = DateTime::createFromFormat('m/d/Y', $cleanDate);
                             if (!$d) $d = DateTime::createFromFormat('n/j/Y', $cleanDate);
                             if (!$d) $d = DateTime::createFromFormat('Y-m-d', $cleanDate);
-                            if ($d) {
-                                $finalDate = $d->format('Y-m-d');
-                            } else {
+                            if ($d) $finalDate = $d->format('Y-m-d');
+                            else {
                                 $ts = strtotime($cleanDate);
                                 if ($ts) $finalDate = date('Y-m-d', $ts);
                             }
@@ -200,27 +190,42 @@ class RtsController {
                     }
                     if (!$finalDate) $finalDate = date('Y-m-d');
 
-                    // Check Header
+                    // 2. CHECK HEADER
                     $rts = $db->query("SELECT id FROM rts_records WHERE rd_number = '{$row[6]}'")->fetch();
                     if (!$rts) {
-                        // Mapped: Ref Doc (Col M/12), GR Num (Col N/13)
                         $refDoc = isset($row[12]) ? trim($row[12]) : '';
                         $grNum  = isset($row[13]) ? trim($row[13]) : '';
 
                         $stmt = $db->prepare("INSERT INTO rts_records (company_id, rd_number, date, plant_code, plant_name, po_number, gr_number, reference_doc, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, 'received', ?, ?)");
-                        $stmt->execute([$row[6], $finalDate, $row[8], $row[9], $row[11], $grNum, $refDoc, $row[4], $row[10]]);
+                        
+                        // Force is_vat_inc = 1 (Last param)
+                        $stmt->execute([$row[6], $finalDate, $row[8], $row[9], $row[11], $grNum, $refDoc, $row[4], 1]);
                         $rtsId = $db->lastInsertId();
                     } else {
                         $rtsId = $rts['id'];
                     }
 
-                    // Lines
-                    $price = floatval(str_replace(',', '', $row[5]));
-                    $qty = floatval(str_replace(',', '', $row[2]));
-                    $amount = $qty * $price;
+                    // 3. PRICE LOGIC FIX
+                    // Col 2 = Qty, Col 5 = Total Ex-Vat Amount
+                    $qty = floatval(str_replace(',', '', $row[2] ?? 0));
+                    $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0));
+
+                    // Calculate Unit Price (Ex Vat)
+                    $unitPrice = ($qty > 0) ? ($totalExVat / $qty) : 0;
+                    
+                    // Calculate Final Amount (Inc Vat) -> This is what we store
+                    $finalAmount = $totalExVat * 1.12; 
 
                     $db->prepare("INSERT INTO rts_lines (rts_id, item_code, description, quantity, uom, price, amount) VALUES (?, ?, ?, ?, ?, ?, ?)")
-                       ->execute([$rtsId, $row[0], $row[1], $qty, $row[3], $price, $amount]);
+                       ->execute([
+                           $rtsId, 
+                           $row[0], // Item Code
+                           $row[1], // Desc
+                           $qty, 
+                           $row[3], // UOM
+                           $unitPrice,   // Saved as Unit Price (Ex Vat)
+                           $finalAmount  // Saved as Total Amount (Inc Vat)
+                       ]);
                 }
                 $db->commit();
             } catch (Exception $e) { $db->rollBack(); }
