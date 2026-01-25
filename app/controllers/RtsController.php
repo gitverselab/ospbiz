@@ -158,12 +158,15 @@ class RtsController {
         exit();
     }
 
-    // --- IMPORT (Fixed Price & Date Logic) ---
+    // --- IMPORT (With Customer Override) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
             $file = fopen($_FILES['csv_file']['tmp_name'], 'r');
             fgetcsv($file); 
+
+            // GET OVERRIDE
+            $overrideCustomer = !empty($_POST['import_customer_name']) ? $_POST['import_customer_name'] : null;
 
             $db->beginTransaction();
             try {
@@ -192,39 +195,52 @@ class RtsController {
 
                     // 2. CHECK HEADER
                     $rts = $db->query("SELECT id FROM rts_records WHERE rd_number = '{$row[6]}'")->fetch();
+                    
+                    // APPLY OVERRIDE IF SELECTED, ELSE USE CSV COLUMN J (Index 9)
+                    $plantName = $overrideCustomer ?? ($row[9] ?? 'Unknown');
+
                     if (!$rts) {
                         $refDoc = isset($row[12]) ? trim($row[12]) : '';
                         $grNum  = isset($row[13]) ? trim($row[13]) : '';
 
                         $stmt = $db->prepare("INSERT INTO rts_records (company_id, rd_number, date, plant_code, plant_name, po_number, gr_number, reference_doc, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, 'received', ?, ?)");
                         
-                        // Force is_vat_inc = 1 (Last param)
-                        $stmt->execute([$row[6], $finalDate, $row[8], $row[9], $row[11], $grNum, $refDoc, $row[4], 1]);
+                        // Use $plantName here
+                        $stmt->execute([
+                            $row[6],        // RD Number
+                            $finalDate,     // Date
+                            $row[8],        // Plant Code
+                            $plantName,     // Plant Name (Override or CSV)
+                            $row[11],       // PO Number
+                            $grNum,         // GR Number
+                            $refDoc,        // Ref Doc
+                            $row[4],        // Currency
+                            1               // Force VAT Inc = 1
+                        ]);
                         $rtsId = $db->lastInsertId();
                     } else {
                         $rtsId = $rts['id'];
                     }
 
                     // 3. PRICE LOGIC FIX
-                    // Col 2 = Qty, Col 5 = Total Ex-Vat Amount
                     $qty = floatval(str_replace(',', '', $row[2] ?? 0));
                     $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0));
 
                     // Calculate Unit Price (Ex Vat)
                     $unitPrice = ($qty > 0) ? ($totalExVat / $qty) : 0;
                     
-                    // Calculate Final Amount (Inc Vat) -> This is what we store
+                    // Calculate Final Amount (Inc Vat)
                     $finalAmount = $totalExVat * 1.12; 
 
                     $db->prepare("INSERT INTO rts_lines (rts_id, item_code, description, quantity, uom, price, amount) VALUES (?, ?, ?, ?, ?, ?, ?)")
                        ->execute([
                            $rtsId, 
-                           $row[0], // Item Code
-                           $row[1], // Desc
+                           $row[0], 
+                           $row[1], 
                            $qty, 
-                           $row[3], // UOM
-                           $unitPrice,   // Saved as Unit Price (Ex Vat)
-                           $finalAmount  // Saved as Total Amount (Inc Vat)
+                           $row[3], 
+                           $unitPrice,   
+                           $finalAmount 
                        ]);
                 }
                 $db->commit();

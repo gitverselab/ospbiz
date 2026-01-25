@@ -274,6 +274,9 @@ elseif ($uri === '/revenue/remittance/create') {
 elseif ($uri === '/revenue/remittance/store') {
     $c = new RemittanceController(); $c->store();
 }
+elseif ($uri === '/revenue/remittance/void') {
+    $c = new RemittanceController(); $c->void();
+}
 // --- SETTINGS ---
 elseif ($uri === '/settings/coa') {
     $c = new COAController(); $c->index();

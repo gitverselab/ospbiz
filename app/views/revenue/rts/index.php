@@ -104,11 +104,9 @@
                             <?= ucfirst($r['status']) ?>
                         </span>
                     </td>
-                    
                     <td class="px-6 py-4 text-center text-sm">
                         <div class="flex flex-col gap-1 items-center">
                             <a href="/revenue/rts/edit?id=<?= $r['rts_id'] ?>" class="text-blue-600 hover:text-blue-800 font-medium">Edit</a>
-                            
                             <form action="/revenue/rts/delete" method="POST" onsubmit="return confirm('Delete this RTS record?');">
                                 <input type="hidden" name="id" value="<?= $r['rts_id'] ?>">
                                 <button type="submit" class="text-red-500 hover:text-red-700 font-medium text-xs">Delete</button>
@@ -178,6 +176,21 @@
     <div class="bg-white p-6 rounded-lg shadow-xl w-96">
         <h3 class="font-bold text-lg mb-4 text-gray-800">Import RTS CSV</h3>
         <form action="/revenue/rts/import" method="POST" enctype="multipart/form-data">
+            
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Select Customer (Optional)</label>
+                <select name="import_customer_name" class="w-full border p-2 rounded text-sm bg-gray-50">
+                    <option value="">-- Use Name from CSV --</option>
+                    <?php foreach($plants as $p): ?>
+                        <option value="<?= htmlspecialchars($p['plant_name'] ?? '') ?>">
+                            <?= htmlspecialchars($p['plant_name'] ?? '') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="text-[10px] text-gray-400 mt-1">If selected, this applies to ALL imported rows.</p>
+            </div>
+
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">CSV File</label>
             <input type="file" name="csv_file" accept=".csv" required class="w-full border p-2 mb-4 rounded bg-gray-50 text-sm">
             <div class="flex justify-end gap-2">
                 <button type="button" onclick="document.getElementById('importRts').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
