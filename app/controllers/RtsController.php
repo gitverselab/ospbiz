@@ -51,11 +51,23 @@ class RtsController {
         $stmt->execute($params);
         $rts = $stmt->fetchAll();
 
-        try { $plants = $db->query("SELECT DISTINCT plant_name FROM rts_records ORDER BY plant_name")->fetchAll(); } catch (Exception $e) { $plants = []; }
+        // --- UPDATED: Fetch from 'customers' table instead of 'rts_records' ---
+        try { 
+            $customers = $db->query("SELECT * FROM customers ORDER BY name")->fetchAll(); 
+        } catch (Exception $e) { 
+            $customers = []; 
+        }
 
         $filters = compact('search', 'plant', 'fromDate', 'toDate', 'limit', 'page', 'totalPages', 'totalRecords');
+        
+        // Pass $customers to the view
+        $data = ['rts' => $rts, 'filters' => $filters, 'customers' => $customers];
+
         $pageTitle = "RTS Management";
         $childView = ROOT_PATH . '/app/views/revenue/rts/index.php';
+        
+        // Extract data for view to use directly
+        extract($data); 
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
 
@@ -165,7 +177,7 @@ class RtsController {
             $file = fopen($_FILES['csv_file']['tmp_name'], 'r');
             fgetcsv($file); 
 
-            // GET OVERRIDE
+            // GET OVERRIDE FROM POST
             $overrideCustomer = !empty($_POST['import_customer_name']) ? $_POST['import_customer_name'] : null;
 
             $db->beginTransaction();
@@ -196,7 +208,8 @@ class RtsController {
                     // 2. CHECK HEADER
                     $rts = $db->query("SELECT id FROM rts_records WHERE rd_number = '{$row[6]}'")->fetch();
                     
-                    // APPLY OVERRIDE IF SELECTED, ELSE USE CSV COLUMN J (Index 9)
+                    // --- CUSTOMER NAME LOGIC ---
+                    // If override is selected, use it. Otherwise, use CSV value (Column J / Index 9)
                     $plantName = $overrideCustomer ?? ($row[9] ?? 'Unknown');
 
                     if (!$rts) {
@@ -205,12 +218,11 @@ class RtsController {
 
                         $stmt = $db->prepare("INSERT INTO rts_records (company_id, rd_number, date, plant_code, plant_name, po_number, gr_number, reference_doc, status, currency, is_vat_inc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, 'received', ?, ?)");
                         
-                        // Use $plantName here
                         $stmt->execute([
                             $row[6],        // RD Number
                             $finalDate,     // Date
                             $row[8],        // Plant Code
-                            $plantName,     // Plant Name (Override or CSV)
+                            $plantName,     // Plant Name (Uses Override if available)
                             $row[11],       // PO Number
                             $grNum,         // GR Number
                             $refDoc,        // Ref Doc
@@ -226,10 +238,7 @@ class RtsController {
                     $qty = floatval(str_replace(',', '', $row[2] ?? 0));
                     $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0));
 
-                    // Calculate Unit Price (Ex Vat)
                     $unitPrice = ($qty > 0) ? ($totalExVat / $qty) : 0;
-                    
-                    // Calculate Final Amount (Inc Vat)
                     $finalAmount = $totalExVat * 1.12; 
 
                     $db->prepare("INSERT INTO rts_lines (rts_id, item_code, description, quantity, uom, price, amount) VALUES (?, ?, ?, ?, ?, ?, ?)")

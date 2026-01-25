@@ -27,9 +27,9 @@
             <label class="text-xs font-bold text-gray-500 uppercase">Plant / Customer</label>
             <select name="plant" class="w-full border p-2 rounded text-sm bg-white">
                 <option value="">All Plants</option>
-                <?php foreach($plants as $p): ?>
-                    <option value="<?= htmlspecialchars($p['plant_name'] ?? '') ?>" <?= (($filters['plant'] ?? '') == ($p['plant_name'] ?? '')) ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($p['plant_name'] ?? '') ?>
+                <?php foreach($customers as $c): ?>
+                    <option value="<?= htmlspecialchars($c['name'] ?? '') ?>" <?= (($filters['plant'] ?? '') == ($c['name'] ?? '')) ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($c['name'] ?? '') ?>
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -128,7 +128,6 @@
     
     <div class="flex gap-1">
         <?php 
-            // 1. Build Base URL
             $params = $_GET; 
             unset($params['page']); 
             $baseUrl = '?' . http_build_query($params) . '&page=';
@@ -136,7 +135,6 @@
             $currPage = (int)($filters['page'] ?? 1);
             $maxPage = (int)($filters['total_pages'] ?? 1);
             
-            // 2. Logic to show window of pages (e.g. 5 pages around current)
             $start = max(1, $currPage - 2);
             $end = min($maxPage, $currPage + 2);
             
@@ -181,13 +179,13 @@
                 <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Select Customer (Optional)</label>
                 <select name="import_customer_name" class="w-full border p-2 rounded text-sm bg-gray-50">
                     <option value="">-- Use Name from CSV --</option>
-                    <?php foreach($plants as $p): ?>
-                        <option value="<?= htmlspecialchars($p['plant_name'] ?? '') ?>">
-                            <?= htmlspecialchars($p['plant_name'] ?? '') ?>
+                    <?php foreach($customers as $c): ?>
+                        <option value="<?= htmlspecialchars($c['name'] ?? '') ?>">
+                            <?= htmlspecialchars($c['name'] ?? '') ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="text-[10px] text-gray-400 mt-1">If selected, this applies to ALL imported rows.</p>
+                <p class="text-[10px] text-gray-400 mt-1">If selected, this customer is used for ALL imported rows.</p>
             </div>
 
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">CSV File</label>
