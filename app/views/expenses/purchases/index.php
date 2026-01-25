@@ -51,16 +51,6 @@
 
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-            <tr>
-                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">PO Number</th>
-                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Date</th>
-                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Supplier</th>
-                <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Status</th>
-                <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Total Amount</th>
-                <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Actions</th>
-            </tr>
-        </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
             <?php if(empty($pos)): ?>
                 <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 italic">No Purchase Orders found matching your criteria.</td></tr>
@@ -84,7 +74,11 @@
                     </td>
                     <td class="px-6 py-4 text-right font-bold text-gray-800">₱<?php echo number_format($po['total_amount'], 2); ?></td>
                     <td class="px-6 py-4 text-center text-sm">
-                        <a href="#" class="text-blue-600 hover:text-blue-900 mr-2">View</a>
+                        <a href="/expenses/purchases/view?id=<?= $po['id'] ?>" class="text-blue-600 hover:text-blue-900 mr-3 font-medium">View</a>
+                        
+                        <?php if($po['status'] !== 'paid'): ?>
+                            <a href="/expenses/purchases/edit?id=<?= $po['id'] ?>" class="text-gray-600 hover:text-gray-900">Edit</a>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

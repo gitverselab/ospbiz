@@ -1,6 +1,17 @@
-<form action="/expenses/purchases/store" method="POST" class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-sm border border-gray-200">
+<?php 
+$isEdit = isset($po); 
+$actionUrl = $isEdit ? "/expenses/purchases/update" : "/expenses/purchases/store";
+?>
+
+<form action="<?= $actionUrl ?>" method="POST" class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-sm border border-gray-200">
+    
+    <?php if($isEdit): ?>
+        <input type="hidden" name="id" value="<?= $po['id'] ?>">
+    <?php endif; ?>
+
     <div class="flex justify-between items-center mb-6 border-b pb-4">
-        <h2 class="text-xl font-bold text-gray-800">New Purchase Order</h2>
+        <h2 class="text-xl font-bold text-gray-800"><?= $isEdit ? "Edit" : "New" ?> Purchase Order</h2>
+        <a href="/expenses/purchases" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</a>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -9,21 +20,23 @@
             <select name="supplier_id" class="w-full border p-2 rounded bg-white" required>
                 <option value="">Select Supplier...</option>
                 <?php foreach($suppliers as $s): ?>
-                    <option value="<?php echo $s['id']; ?>"><?php echo htmlspecialchars($s['name']); ?></option>
+                    <option value="<?= $s['id'] ?>" <?= ($isEdit && $po['supplier_id'] == $s['id']) ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($s['name']) ?>
+                    </option>
                 <?php endforeach; ?>
             </select>
         </div>
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">PO Number</label>
-            <input type="text" name="po_number" class="w-full border p-2 rounded" placeholder="e.g. PO-2023-001" required>
+            <input type="text" name="po_number" value="<?= $isEdit ? htmlspecialchars($po['po_number']) : '' ?>" class="w-full border p-2 rounded" placeholder="e.g. PO-2023-001" required>
         </div>
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">PO Date</label>
-            <input type="date" name="date" value="<?php echo date('Y-m-d'); ?>" class="w-full border p-2 rounded">
+            <input type="date" name="date" value="<?= $isEdit ? $po['date'] : date('Y-m-d') ?>" class="w-full border p-2 rounded">
         </div>
         <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Expected Delivery</label>
-            <input type="date" name="expected_delivery_date" class="w-full border p-2 rounded">
+            <input type="date" name="expected_delivery_date" value="<?= $isEdit ? $po['expected_delivery_date'] : '' ?>" class="w-full border p-2 rounded">
         </div>
     </div>
 
@@ -38,8 +51,7 @@
                 <th class="w-10"></th>
             </tr>
         </thead>
-        <tbody id="poLines">
-            </tbody>
+        <tbody id="poLines"></tbody>
     </table>
     
     <button type="button" onclick="addLine()" class="text-blue-600 text-sm font-bold hover:underline mb-6">
@@ -54,23 +66,27 @@
             <div class="text-2xl font-bold text-gray-800" id="grandTotalDisplay">₱0.00</div>
         </div>
         <button type="submit" onclick="prepareSubmit(event)" class="bg-blue-600 text-white px-6 py-3 rounded font-bold hover:bg-blue-700 shadow">
-            Save Purchase Order
+            <?= $isEdit ? "Update" : "Save" ?> Purchase Order
         </button>
     </div>
 </form>
 
 <script>
-function addLine() {
+// If Editing, load existing lines
+const existingLines = <?= $isEdit ? json_encode($lines) : '[]' ?>;
+
+function addLine(data = null) {
     const tr = document.createElement('tr');
     tr.className = "border-b hover:bg-gray-50";
     tr.innerHTML = `
-        <td class="p-2"><input class="w-full border p-1 rounded text-sm desc" placeholder="Enter item name..." required></td>
-        <td class="p-2"><input class="w-full border p-1 rounded text-sm text-right qty" type="number" step="0.01" value="1" oninput="calcRow(this)" required></td>
-        <td class="p-2"><input class="w-full border p-1 rounded text-sm text-right price" type="number" step="0.01" value="0" oninput="calcRow(this)" required></td>
+        <td class="p-2"><input class="w-full border p-1 rounded text-sm desc" value="${data ? data.description : ''}" placeholder="Enter item name..." required></td>
+        <td class="p-2"><input class="w-full border p-1 rounded text-sm text-right qty" type="number" step="0.01" value="${data ? data.quantity : 1}" oninput="calcRow(this)" required></td>
+        <td class="p-2"><input class="w-full border p-1 rounded text-sm text-right price" type="number" step="0.01" value="${data ? data.unit_price : 0}" oninput="calcRow(this)" required></td>
         <td class="p-2 text-right font-bold text-gray-700 row-total">0.00</td>
         <td class="p-2 text-center"><button type="button" onclick="this.closest('tr').remove(); calcTotal();" class="text-red-400 hover:text-red-600"><i class="fa-solid fa-times"></i></button></td>
     `;
     document.getElementById('poLines').appendChild(tr);
+    calcRow(tr.querySelector('.qty')); // Calc initial total
 }
 
 function calcRow(el) {
@@ -93,7 +109,6 @@ function calcTotal() {
 }
 
 function prepareSubmit(e) {
-    // Collect all lines into JSON
     const lines = [];
     document.querySelectorAll('#poLines tr').forEach(row => {
         lines.push({
@@ -103,9 +118,19 @@ function prepareSubmit(e) {
             amount: (parseFloat(row.querySelector('.qty').value) * parseFloat(row.querySelector('.price').value))
         });
     });
+    
+    if(lines.length === 0) {
+        alert("Please add at least one item.");
+        e.preventDefault();
+        return;
+    }
     document.getElementById('linesJson').value = JSON.stringify(lines);
 }
 
-// Initialize with one empty line
-addLine();
+// Initialize
+if (existingLines.length > 0) {
+    existingLines.forEach(line => addLine(line));
+} else {
+    addLine();
+}
 </script>

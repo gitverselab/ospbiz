@@ -108,6 +108,15 @@ elseif ($uri === '/expenses/purchases/create') {
 elseif ($uri === '/expenses/purchases/store') {
     $c = new PurchaseController(); $c->store();
 }
+elseif ($uri === '/expenses/purchases/view') {
+    $c = new PurchaseController(); $c->show();
+}
+elseif ($uri === '/expenses/purchases/edit') {
+    $c = new PurchaseController(); $c->edit();
+}
+elseif ($uri === '/expenses/purchases/update') {
+    $c = new PurchaseController(); $c->update();
+}
 
 // --- EXPENSES: PAYMENTS ---
 elseif ($uri === '/expenses/payments') {
