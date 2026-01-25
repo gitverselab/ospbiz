@@ -71,17 +71,41 @@ class RemittanceController {
         // 1. Get Customers with UNPAID Invoices
         $customers = $db->query("SELECT DISTINCT customer_name FROM sales_invoices WHERE status = 'unpaid' ORDER BY customer_name")->fetchAll();
         
-        // 2. Get Open Invoices for Selected Customer
         $openInvoices = [];
+        $openRts = [];
+
         if (isset($_GET['customer'])) {
             $cust = $_GET['customer'];
+            
+            // 2. Get Open Invoices
             $invSql = "SELECT * FROM sales_invoices WHERE customer_name = ? AND status = 'unpaid' ORDER BY date ASC";
             $stmt = $db->prepare($invSql);
             $stmt->execute([$cust]);
             $openInvoices = $stmt->fetchAll();
+
+            // 3. Get Open RTS (Deductions) - Assuming plant_name matches customer_name
+            // We look for status 'received' (meaning approved return, not yet deducted)
+            $rtsSql = "SELECT * FROM rts_records WHERE plant_name = ? AND status = 'received' ORDER BY date ASC";
+            $stmtRts = $db->prepare($rtsSql);
+            $stmtRts->execute([$cust]);
+            
+            // Calculate total amount for each RTS header by summing lines
+            $rawRts = $stmtRts->fetchAll();
+            foreach($rawRts as $r) {
+                // Sum lines for this RTS
+                $sum = $db->query("SELECT SUM(amount) as total FROM rts_lines WHERE rts_id = {$r['id']}")->fetch()['total'];
+                
+                // Add VAT if inclusive? Usually returns are gross. 
+                // Let's assume the line amount is the value to deduct.
+                // If is_vat_inc is 0, we might need to add VAT, but usually line amounts in DB are final.
+                // For safety, let's recalculate based on header flag if needed, 
+                // but relying on stored line amounts is safer if your previous code stored them correctly.
+                $r['total_amount'] = $sum ?? 0;
+                $openRts[] = $r;
+            }
         }
 
-        // 3. Get Bank Accounts for Deposit
+        // 4. Get Bank Accounts
         $banks = $db->query("SELECT * FROM financial_accounts WHERE type IN ('bank', 'cash') ORDER BY name")->fetchAll();
 
         $pageTitle = "Record Payment Remittance";
@@ -100,102 +124,181 @@ class RemittanceController {
                 $date = $_POST['date'];
                 $ref = $_POST['reference_no'];
                 $bankId = $_POST['financial_account_id'];
+                
                 $selectedInvIds = $_POST['invoice_ids'] ?? [];
+                $selectedRtsIds = $_POST['rts_ids'] ?? [];
 
                 if (empty($selectedInvIds)) die("No invoices selected.");
                 if (empty($bankId)) die("Please select a deposit account.");
 
-                // 1. Calculate Totals from Selected Invoices
-                $placeholders = str_repeat('?,', count($selectedInvIds) - 1) . '?';
-                $sql = "SELECT * FROM sales_invoices WHERE id IN ($placeholders)";
-                $stmt = $db->prepare($sql);
-                $stmt->execute($selectedInvIds);
-                $invoices = $stmt->fetchAll();
+                // 1. Calculate Invoices Total
+                $placeholdersInv = str_repeat('?,', count($selectedInvIds) - 1) . '?';
+                $stmtInv = $db->prepare("SELECT * FROM sales_invoices WHERE id IN ($placeholdersInv)");
+                $stmtInv->execute($selectedInvIds);
+                $invoices = $stmtInv->fetchAll();
 
                 $totalGross = 0;
                 $totalVatable = 0;
-
                 foreach ($invoices as $inv) {
                     $totalGross += floatval($inv['total_amount_due']);
                     $totalVatable += floatval($inv['vatable_sales']);
                 }
 
-                // 2. Calculate WHT (1% of Total Vatable) - Matches the remittance image
-                $totalWht = $totalVatable * 0.01;
-                
-                // 3. Calculate Net Received
-                $netReceived = $totalGross - $totalWht;
+                // 2. Calculate RTS Deductions
+                $totalRtsDeduction = 0;
+                $rtsRecords = [];
+                if (!empty($selectedRtsIds)) {
+                    $placeholdersRts = str_repeat('?,', count($selectedRtsIds) - 1) . '?';
+                    // We need to sum lines again or fetch strictly.
+                    // Let's fetch records first
+                    $stmtRts = $db->prepare("SELECT * FROM rts_records WHERE id IN ($placeholdersRts)");
+                    $stmtRts->execute($selectedRtsIds);
+                    $rtsRecords = $stmtRts->fetchAll();
 
-                // 4. Insert Remittance Record
+                    foreach($rtsRecords as $r) {
+                        // Sum lines
+                        $sum = $db->query("SELECT SUM(amount) as total FROM rts_lines WHERE rts_id = {$r['id']}")->fetch()['total'];
+                        // Handle VAT logic for RTS if needed (e.g. if lines are Ex-Vat). 
+                        // Assuming lines are stored as Final Amounts (Inc Vat) based on RTS Controller fix.
+                        $amt = floatval($sum);
+                        if ($r['is_vat_inc'] == 0) { 
+                            $amt = $amt * 1.12; // Add VAT if stored exclusive
+                        }
+                        $totalRtsDeduction += $amt;
+                    }
+                }
+
+                // 3. Calculate WHT and Net
+                $totalWht = $totalVatable * 0.01;
+                $netReceived = $totalGross - $totalWht - $totalRtsDeduction;
+
+                if ($netReceived < 0) die("Error: Deductions exceed payment amount.");
+
+                // 4. Insert Remittance
+                // Note: You might need to add a 'total_rts_amount' column to your DB table if you want to track it explicitly
                 $insertRemit = $db->prepare("INSERT INTO payment_remittances (company_id, date, customer_name, reference_no, financial_account_id, total_gross_amount, total_wht_amount, net_amount_received) VALUES (1, ?, ?, ?, ?, ?, ?, ?)");
                 $insertRemit->execute([$date, $customer, $ref, $bankId, $totalGross, $totalWht, $netReceived]);
                 $remitId = $db->lastInsertId();
 
-                // 5. Link Invoices and Mark as Paid
-                $linkStmt = $db->prepare("INSERT INTO remittance_invoice_links (remittance_id, invoice_id, applied_amount) VALUES (?, ?, ?)");
+                // 5. Process Invoices (Mark Paid)
+                $linkInv = $db->prepare("INSERT INTO remittance_invoice_links (remittance_id, invoice_id, applied_amount) VALUES (?, ?, ?)");
                 $updateInv = $db->prepare("UPDATE sales_invoices SET status = 'paid' WHERE id = ?");
-
                 foreach ($invoices as $inv) {
-                    // Link the full invoice amount
-                    $linkStmt->execute([$remitId, $inv['id'], $inv['total_amount_due']]);
-                    // Mark as paid
+                    $linkInv->execute([$remitId, $inv['id'], $inv['total_amount_due']]);
                     $updateInv->execute([$inv['id']]);
                 }
 
-                // 6. Update Bank Balance (Add Net Amount Received)
+                // 6. Process RTS (Mark Deducted)
+                // We need a link table for RTS too. If it doesn't exist, create it:
+                // CREATE TABLE remittance_rts_links (id INT PK, remittance_id INT, rts_id INT, amount DECIMAL);
+                $linkRts = $db->prepare("INSERT INTO remittance_rts_links (remittance_id, rts_id, amount) VALUES (?, ?, ?)");
+                $updateRts = $db->prepare("UPDATE rts_records SET status = 'deducted' WHERE id = ?");
+                
+                // Re-loop to calculate exact amount per RTS for linking
+                foreach($rtsRecords as $r) {
+                    $sum = $db->query("SELECT SUM(amount) as total FROM rts_lines WHERE rts_id = {$r['id']}")->fetch()['total'];
+                    $amt = floatval($sum);
+                    if ($r['is_vat_inc'] == 0) $amt *= 1.12;
+                    
+                    $linkRts->execute([$remitId, $r['id'], $amt]);
+                    $updateRts->execute([$r['id']]);
+                }
+
+                // 7. Update Bank
                 $db->prepare("UPDATE financial_accounts SET current_balance = current_balance + ? WHERE id = ?")
                    ->execute([$netReceived, $bankId]);
 
-                // 7. Record Transaction Log
-                $desc = "Payment from $customer for " . count($invoices) . " invoices (Ref: $ref)";
-                $db->prepare("INSERT INTO account_transactions (financial_account_id, date, type, amount, description, reference_no) VALUES (?, ?, 'debit', ?, ?, ?)")
-                   ->execute([$bankId, $date, $netReceived, $desc, $ref]);
-
-                // 8. AUTOMATIC JOURNAL ENTRY
+                // 8. Journal Entry
                 $entries = [];
-
-                // Entry 1: Debit Cash in Bank (Net Amount Received)
-                // We need to fetch the Account Code of the selected Bank
+                
+                // Get Bank Code
                 $bankAcc = $db->query("SELECT code FROM accounts WHERE id = (SELECT account_id FROM financial_accounts WHERE id=$bankId)")->fetch();
-                $bankCode = $bankAcc['code'] ?? '1010'; // Fallback if not linked
+                $bankCode = $bankAcc['code'] ?? '1010'; 
 
-                $entries[] = [
-                    'code' => $bankCode, 
-                    'desc' => "Payment from $customer (Ref: $ref)",
-                    'debit' => $netReceived,
-                    'credit' => 0
-                ];
-
-                // Entry 2: Debit Creditable Withholding Tax (CWT)
+                // Dr Cash
+                $entries[] = [ 'code' => $bankCode, 'desc' => "Collection (Ref: $ref)", 'debit' => $netReceived, 'credit' => 0 ];
+                
+                // Dr WHT
                 if ($totalWht > 0) {
-                    $entries[] = [
-                        'code' => '1300', // Ensure this matches "Creditable Withholding Tax"
-                        'desc' => "CWT (1%) - Ref: $ref",
-                        'debit' => $totalWht,
-                        'credit' => 0
-                    ];
+                    $entries[] = [ 'code' => '1300', 'desc' => "CWT (1%)", 'debit' => $totalWht, 'credit' => 0 ];
                 }
 
-                // Entry 3: Credit Accounts Receivable (Total Gross Amount Paid)
-                $entries[] = [
-                    'code' => '1200', // Accounts Receivable
-                    'desc' => "Payment Received - $customer",
-                    'debit' => 0,
-                    'credit' => $totalGross
-                ];
+                // Dr Sales Returns (RTS)
+                if ($totalRtsDeduction > 0) {
+                    $entries[] = [ 'code' => '4100', 'desc' => "Returns/Deductions", 'debit' => $totalRtsDeduction, 'credit' => 0 ];
+                }
 
-                // Call the Journal Helper
+                // Cr AR (Total Invoice Gross)
+                $entries[] = [ 'code' => '1200', 'desc' => "Clear AR - $customer", 'debit' => 0, 'credit' => $totalGross ];
+
                 require_once ROOT_PATH . '/app/controllers/JournalController.php';
-                JournalController::post(
-                    $date, 
-                    $ref, 
-                    "Collection from $customer", 
-                    'remittance', 
-                    $remitId, 
-                    $entries
-                );
+                JournalController::post($date, $ref, "Collection from $customer", 'remittance', $remitId, $entries);
 
-                $db->commit(); // <--- Commit AFTER posting
+                $db->commit();
+                header("Location: /revenue/remittance");
+
+            } catch (Exception $e) {
+                $db->rollBack();
+                die($e->getMessage());
+            }
+        }
+    }
+
+    // --- VOID / ROLLBACK REMITTANCE ---
+    public function void() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $db = Database::getInstance();
+            $id = $_POST['id'];
+
+            try {
+                $db->beginTransaction();
+
+                // 1. Get Remittance Info
+                $remit = $db->query("SELECT * FROM payment_remittances WHERE id = $id")->fetch();
+                if (!$remit) die("Remittance not found.");
+
+                // 2. Revert Bank Balance
+                $db->prepare("UPDATE financial_accounts SET current_balance = current_balance - ? WHERE id = ?")
+                   ->execute([$remit['net_amount_received'], $remit['financial_account_id']]);
+
+                // 3. Revert Invoices (Set to 'unpaid')
+                $db->prepare("UPDATE sales_invoices SET status = 'unpaid' 
+                              WHERE id IN (SELECT invoice_id FROM remittance_invoice_links WHERE remittance_id=?)")
+                   ->execute([$id]);
+
+                // 4. Revert RTS (Set to 'received')
+                // Check if table exists first to avoid error if no RTS were linked
+                $db->prepare("UPDATE rts_records SET status = 'received' 
+                              WHERE id IN (SELECT rts_id FROM remittance_rts_links WHERE remittance_id=?)")
+                   ->execute([$id]);
+
+                // 5. Reverse Journal Entry
+                // We fetch the original journal for this remittance
+                $journal = $db->query("SELECT * FROM journals WHERE reference_type = 'remittance' AND reference_id = $id")->fetch();
+                if ($journal) {
+                    // Create Reversal (Swap Debits and Credits)
+                    $lines = $db->query("SELECT * FROM journal_lines WHERE journal_id = {$journal['id']}")->fetchAll();
+                    $newEntries = [];
+                    foreach($lines as $line) {
+                        $newEntries[] = [
+                            'code' => $line['account_code'],
+                            'desc' => "VOID/REVERSAL: " . $line['description'],
+                            'debit' => $line['credit_amount'], // Swap
+                            'credit' => $line['debit_amount']  // Swap
+                        ];
+                    }
+                    require_once ROOT_PATH . '/app/controllers/JournalController.php';
+                    JournalController::post(date('Y-m-d'), "VOID-".$remit['reference_no'], "Void Remittance #$id", 'journal', 0, $newEntries);
+                }
+
+                // 6. Delete Links
+                $db->prepare("DELETE FROM remittance_invoice_links WHERE remittance_id = ?")->execute([$id]);
+                $db->prepare("DELETE FROM remittance_rts_links WHERE remittance_id = ?")->execute([$id]);
+
+                // 7. Delete Remittance Record
+                $db->prepare("DELETE FROM payment_remittances WHERE id = ?")->execute([$id]);
+
+                $db->commit();
                 header("Location: /revenue/remittance");
 
             } catch (Exception $e) {

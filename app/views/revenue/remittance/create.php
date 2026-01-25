@@ -26,12 +26,12 @@
                 </div>
                 
                 <div class="mb-4">
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Reference No. (e.g. Check #, Doc No.)</label>
-                    <input type="text" name="reference_no" class="w-full border p-2 rounded" placeholder="e.g. 200187284">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Reference No.</label>
+                    <input type="text" name="reference_no" class="w-full border p-2 rounded" placeholder="e.g. Check #12345" required>
                 </div>
 
                 <div class="mb-6">
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Deposit To (Bank/Cash)</label>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Deposit To</label>
                     <select name="financial_account_id" class="w-full border p-2 rounded bg-white" required>
                         <option value="">-- Select Account --</option>
                         <?php foreach($banks as $b): ?>
@@ -41,25 +41,27 @@
                 </div>
 
                 <div class="bg-gray-50 p-4 rounded border-t-4 border-green-500">
-                    <h3 class="font-bold text-gray-700 mb-3 text-sm uppercase">Payment Summary</h3>
+                    <h3 class="font-bold text-gray-700 mb-3 text-sm uppercase">Payment Calculation</h3>
                     
                     <div class="flex justify-between mb-2 text-sm">
-                        <span class="text-gray-500">Total Gross (Invoice Amt):</span>
+                        <span class="text-gray-500">Total Invoices:</span>
                         <span class="font-bold text-gray-800" id="grossDisplay">0.00</span>
                     </div>
 
                     <div class="flex justify-between mb-2 text-sm">
-                        <div class="flex flex-col">
-                            <span class="text-gray-500">Less: WHT (1%)</span>
-                            <span class="text-[10px] text-gray-400 italic">(on Vatable Amount)</span>
-                        </div>
+                        <span class="text-gray-500">Less: WHT (1%)</span>
                         <span class="font-bold text-red-500" id="whtDisplay">(0.00)</span>
+                    </div>
+
+                    <div class="flex justify-between mb-2 text-sm">
+                        <span class="text-gray-500">Less: Returns (RTS)</span>
+                        <span class="font-bold text-red-500" id="rtsDisplay">(0.00)</span>
                     </div>
 
                     <div class="border-t border-gray-300 my-2"></div>
 
                     <div class="flex justify-between text-lg">
-                        <span class="font-bold text-gray-700">Net Amount Paid:</span>
+                        <span class="font-bold text-gray-700">Net Received:</span>
                         <span class="font-bold text-green-700" id="netDisplay">₱0.00</span>
                     </div>
                 </div>
@@ -69,99 +71,159 @@
                 </button>
 
                 <div id="selectedInvContainer"></div>
+                <div id="selectedRtsContainer"></div>
 
                 <?php endif; ?>
             </form>
         </div>
     </div>
 
-    <div class="w-full md:w-2/3">
-        <div class="bg-white p-6 rounded shadow border h-full">
-            <h2 class="text-lg font-bold mb-4 text-gray-800">2. Select Invoices to Pay</h2>
-
+    <div class="w-full md:w-2/3 flex flex-col gap-6">
+        
+        <div class="bg-white p-6 rounded shadow border">
+            <h2 class="text-lg font-bold mb-4 text-blue-800">2. Select Invoices (Add)</h2>
             <?php if(!isset($_GET['customer'])): ?>
-                <div class="text-center text-gray-400 py-10">Select a customer first.</div>
+                <div class="text-gray-400">Select customer first.</div>
             <?php elseif(empty($openInvoices)): ?>
-                <div class="text-center text-gray-500 py-10 bg-gray-50 rounded border border-dashed">No unpaid invoices found for this customer.</div>
+                <div class="text-gray-500 italic">No unpaid invoices.</div>
             <?php else: ?>
-                
-                <div class="overflow-y-auto max-h-[600px] border rounded">
-                    <table class="w-full text-sm text-left">
-                        <thead class="bg-gray-100 uppercase text-xs">
+                <div class="overflow-y-auto max-h-[300px] border rounded">
+                    <table class="w-full text-sm">
+                        <thead class="bg-blue-50 text-xs uppercase">
                             <tr>
-                                <th class="p-3 w-10 text-center">Select</th>
-                                <th class="p-3">Invoice No.</th>
-                                <th class="p-3">Date</th>
-                                <th class="p-3 text-right">Gross Amount</th>
-                                <th class="p-3 text-right text-gray-500">Vatable Amt</th>
+                                <th class="p-2 text-center">✔</th>
+                                <th class="p-2">Invoice #</th>
+                                <th class="p-2">Date</th>
+                                <th class="p-2 text-right">Amount</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach($openInvoices as $inv): ?>
-                            <tr class="border-b hover:bg-green-50 cursor-pointer" onclick="toggleCheckbox('check_<?= $inv['id'] ?>')">
-                                <td class="p-3 text-center">
-                                    <input type="checkbox" 
-                                           class="inv-checkbox w-4 h-4 text-green-600" 
-                                           id="check_<?= $inv['id'] ?>" 
+                            <tr class="border-b hover:bg-blue-50 cursor-pointer" onclick="toggleInv('inv_<?= $inv['id'] ?>')">
+                                <td class="p-2 text-center">
+                                    <input type="checkbox" class="inv-cb" id="inv_<?= $inv['id'] ?>" 
                                            value="<?= $inv['id'] ?>" 
                                            data-gross="<?= $inv['total_amount_due'] ?>"
                                            data-vatable="<?= $inv['vatable_sales'] ?>"
-                                           onclick="event.stopPropagation(); updateSelection();">
+                                           onclick="event.stopPropagation(); updateCalc();">
                                 </td>
-                                <td class="p-3 font-bold text-blue-600 font-mono"><?= htmlspecialchars($inv['invoice_number']) ?></td>
-                                <td class="p-3"><?= $inv['date'] ?></td>
-                                <td class="p-3 text-right font-bold">₱<?= number_format($inv['total_amount_due'], 2) ?></td>
-                                <td class="p-3 text-right text-gray-500">₱<?= number_format($inv['vatable_sales'], 2) ?></td>
+                                <td class="p-2 font-mono font-bold text-blue-600"><?= $inv['invoice_number'] ?></td>
+                                <td class="p-2"><?= $inv['date'] ?></td>
+                                <td class="p-2 text-right">₱<?= number_format($inv['total_amount_due'], 2) ?></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-
-                <div class="mt-4 text-right text-sm text-gray-500">
-                    Selected: <span id="countSelected" class="font-bold text-gray-800">0</span> Invoices
-                </div>
-
             <?php endif; ?>
         </div>
+
+        <div class="bg-white p-6 rounded shadow border">
+            <h2 class="text-lg font-bold mb-4 text-red-800">3. Select Returns (Deduct)</h2>
+            <?php if(!isset($_GET['customer'])): ?>
+                <div class="text-gray-400">Select customer first.</div>
+            <?php elseif(empty($openRts)): ?>
+                <div class="text-gray-500 italic">No approved returns available.</div>
+            <?php else: ?>
+                <div class="overflow-y-auto max-h-[300px] border rounded">
+                    <table class="w-full text-sm">
+                        <thead class="bg-red-50 text-xs uppercase">
+                            <tr>
+                                <th class="p-2 text-center">✔</th>
+                                <th class="p-2">RD #</th>
+                                <th class="p-2">Date</th>
+                                <th class="p-2 text-right">Deduction</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach($openRts as $r): 
+                                $amt = $r['total_amount'];
+                                if($r['is_vat_inc'] == 0) $amt *= 1.12; 
+                            ?>
+                            <tr class="border-b hover:bg-red-50 cursor-pointer" onclick="toggleRts('rts_<?= $r['id'] ?>')">
+                                <td class="p-2 text-center">
+                                    <input type="checkbox" class="rts-cb" id="rts_<?= $r['id'] ?>" 
+                                           value="<?= $r['id'] ?>" 
+                                           data-amount="<?= $amt ?>"
+                                           onclick="event.stopPropagation(); updateCalc();">
+                                </td>
+                                <td class="p-2 font-mono font-bold text-red-600"><?= $r['rd_number'] ?></td>
+                                <td class="p-2"><?= $r['date'] ?></td>
+                                <td class="p-2 text-right">₱<?= number_format($amt, 2) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+
     </div>
 </div>
 
 <script>
-function toggleCheckbox(id) {
+function toggleInv(id) {
     const cb = document.getElementById(id);
     cb.checked = !cb.checked;
-    updateSelection();
+    updateCalc();
+}
+function toggleRts(id) {
+    const cb = document.getElementById(id);
+    cb.checked = !cb.checked;
+    updateCalc();
 }
 
-function updateSelection() {
+function updateCalc() {
     let totalGross = 0;
     let totalVatable = 0;
-    let count = 0;
-    const container = document.getElementById('selectedInvContainer');
-    container.innerHTML = ''; 
+    let totalRts = 0;
 
-    document.querySelectorAll('.inv-checkbox:checked').forEach(cb => {
+    const invContainer = document.getElementById('selectedInvContainer');
+    const rtsContainer = document.getElementById('selectedRtsContainer');
+    invContainer.innerHTML = '';
+    rtsContainer.innerHTML = '';
+
+    // Sum Invoices
+    document.querySelectorAll('.inv-cb:checked').forEach(cb => {
         totalGross += parseFloat(cb.dataset.gross);
         totalVatable += parseFloat(cb.dataset.vatable);
-        count++;
-
-        // Create hidden input for form
+        
         const input = document.createElement('input');
         input.type = 'hidden';
         input.name = 'invoice_ids[]';
         input.value = cb.value;
-        container.appendChild(input);
+        invContainer.appendChild(input);
     });
 
-    // Calculate WHT (1% of Vatable) and Net
-    const wht = totalVatable * 0.01;
-    const net = totalGross - wht;
+    // Sum RTS
+    document.querySelectorAll('.rts-cb:checked').forEach(cb => {
+        totalRts += parseFloat(cb.dataset.amount);
+        
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'rts_ids[]';
+        input.value = cb.value;
+        rtsContainer.appendChild(input);
+    });
 
-    // Update Displays
+    // Calculate
+    const wht = totalVatable * 0.01;
+    const net = totalGross - wht - totalRts;
+
+    // Display
     document.getElementById('grossDisplay').innerText = totalGross.toLocaleString('en-US', {minimumFractionDigits: 2});
     document.getElementById('whtDisplay').innerText = '(' + wht.toLocaleString('en-US', {minimumFractionDigits: 2}) + ')';
-    document.getElementById('netDisplay').innerText = '₱' + net.toLocaleString('en-US', {minimumFractionDigits: 2});
-    document.getElementById('countSelected').innerText = count;
+    document.getElementById('rtsDisplay').innerText = '(' + totalRts.toLocaleString('en-US', {minimumFractionDigits: 2}) + ')';
+    
+    const netEl = document.getElementById('netDisplay');
+    netEl.innerText = '₱' + net.toLocaleString('en-US', {minimumFractionDigits: 2});
+    
+    if (net < 0) {
+        netEl.classList.remove('text-green-700');
+        netEl.classList.add('text-red-600');
+    } else {
+        netEl.classList.add('text-green-700');
+        netEl.classList.remove('text-red-600');
+    }
 }
 </script>
