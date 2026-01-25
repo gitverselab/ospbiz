@@ -10,35 +10,35 @@
         
         <div class="flex-1 w-full">
             <label class="text-xs font-bold text-gray-500 uppercase">Search</label>
-            <input type="text" name="search" value="<?php echo htmlspecialchars($filters['search']); ?>" placeholder="Reference # or Supplier..." class="w-full border p-2 rounded text-sm">
+            <input type="text" name="search" value="<?= htmlspecialchars($filters['search'] ?? '') ?>" placeholder="Reference # or Supplier..." class="w-full border p-2 rounded text-sm">
         </div>
 
         <div class="w-full md:w-32">
             <label class="text-xs font-bold text-gray-500 uppercase">From</label>
-            <input type="date" name="from" value="<?php echo htmlspecialchars($filters['from']); ?>" class="w-full border p-2 rounded text-sm">
+            <input type="date" name="from" value="<?= htmlspecialchars($filters['from'] ?? '') ?>" class="w-full border p-2 rounded text-sm">
         </div>
         <div class="w-full md:w-32">
             <label class="text-xs font-bold text-gray-500 uppercase">To</label>
-            <input type="date" name="to" value="<?php echo htmlspecialchars($filters['to']); ?>" class="w-full border p-2 rounded text-sm">
+            <input type="date" name="to" value="<?= htmlspecialchars($filters['to'] ?? '') ?>" class="w-full border p-2 rounded text-sm">
         </div>
 
         <div class="w-full md:w-32">
             <label class="text-xs font-bold text-gray-500 uppercase">Method</label>
             <select name="method" class="w-full border p-2 rounded text-sm bg-white">
                 <option value="">All</option>
-                <option value="check" <?php echo ($filters['method'] == 'check') ? 'selected' : ''; ?>>Check</option>
-                <option value="transfer" <?php echo ($filters['method'] == 'transfer') ? 'selected' : ''; ?>>Transfer</option>
-                <option value="cash" <?php echo ($filters['method'] == 'cash') ? 'selected' : ''; ?>>Cash</option>
+                <option value="check" <?= (($filters['method'] ?? '') == 'check') ? 'selected' : '' ?>>Check</option>
+                <option value="transfer" <?= (($filters['method'] ?? '') == 'transfer') ? 'selected' : '' ?>>Transfer</option>
+                <option value="cash" <?= (($filters['method'] ?? '') == 'cash') ? 'selected' : '' ?>>Cash</option>
             </select>
         </div>
 
         <div class="w-full md:w-24">
             <label class="text-xs font-bold text-gray-500 uppercase">Show</label>
-            <select name="limit" class="w-full border p-2 rounded text-sm bg-white">
-                <option value="10" <?php echo ($filters['limit'] == 10) ? 'selected' : ''; ?>>10</option>
-                <option value="25" <?php echo ($filters['limit'] == 25) ? 'selected' : ''; ?>>25</option>
-                <option value="50" <?php echo ($filters['limit'] == 50) ? 'selected' : ''; ?>>50</option>
-                <option value="100" <?php echo ($filters['limit'] == 100) ? 'selected' : ''; ?>>100</option>
+            <select name="limit" class="w-full border p-2 rounded text-sm bg-white" onchange="this.form.submit()">
+                <?php $lim = $filters['limit'] ?? 10; ?>
+                <option value="10" <?= ($lim == 10) ? 'selected' : '' ?>>10</option>
+                <option value="25" <?= ($lim == 25) ? 'selected' : '' ?>>25</option>
+                <option value="50" <?= ($lim == 50) ? 'selected' : '' ?>>50</option>
             </select>
         </div>
 
@@ -58,26 +58,22 @@
                 <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Paid From</th>
                 <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Reference</th>
                 <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Total Paid</th>
-                <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Action</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
             <?php if(empty($payments)): ?>
-                <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 italic">No payments found matching your criteria.</td></tr>
+                <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500 italic">No payments found matching your criteria.</td></tr>
             <?php else: ?>
                 <?php foreach ($payments as $p): ?>
                 <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm text-gray-900"><?php echo date('M j, Y', strtotime($p['date'])); ?></td>
-                    <td class="px-6 py-4 text-sm font-medium text-gray-900"><?php echo htmlspecialchars($p['supplier_name']); ?></td>
+                    <td class="px-6 py-4 text-sm text-gray-900"><?= date('M j, Y', strtotime($p['date'])) ?></td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= htmlspecialchars($p['supplier_name']) ?></td>
                     <td class="px-6 py-4 text-sm text-gray-500">
-                        <?php echo htmlspecialchars($p['account_name']); ?>
-                        <span class="text-xs text-gray-400 block uppercase font-bold"><?php echo $p['payment_method']; ?></span>
+                        <?= htmlspecialchars($p['account_name']) ?>
+                        <span class="text-xs text-gray-400 block uppercase font-bold"><?= $p['payment_method'] ?></span>
                     </td>
-                    <td class="px-6 py-4 text-sm font-mono text-blue-600"><?php echo htmlspecialchars($p['reference_no']); ?></td>
-                    <td class="px-6 py-4 text-right font-bold text-gray-800">₱<?php echo number_format($p['total_paid'], 2); ?></td>
-                    <td class="px-6 py-4 text-center text-sm">
-                        <a href="#" class="text-blue-600 hover:text-blue-900 mr-2">View</a>
-                    </td>
+                    <td class="px-6 py-4 text-sm font-mono text-blue-600"><?= htmlspecialchars($p['reference_no']) ?></td>
+                    <td class="px-6 py-4 text-right font-bold text-gray-800">₱<?= number_format($p['total_paid'], 2) ?></td>
                 </tr>
                 <?php endforeach; ?>
             <?php endif; ?>
@@ -87,8 +83,8 @@
 
 <div class="flex justify-between items-center mt-4">
     <div class="text-sm text-gray-500">
-        Showing Page <?php echo $filters['page']; ?> of <?php echo $filters['total_pages']; ?> 
-        (Total <?php echo $filters['total_records']; ?> records)
+        Showing Page <?= $filters['page'] ?? 1 ?> of <?= $filters['total_pages'] ?? 1 ?> 
+        (Total <?= $filters['total_records'] ?? 0 ?> records)
     </div>
     
     <div class="flex gap-2">
@@ -96,22 +92,24 @@
             $params = $_GET; 
             unset($params['page']); 
             $baseUrl = '?' . http_build_query($params) . '&page=';
+            $currPage = $filters['page'] ?? 1;
+            $maxPage = $filters['total_pages'] ?? 1;
         ?>
 
-        <?php if ($filters['page'] > 1): ?>
-            <a href="<?php echo $baseUrl . ($filters['page'] - 1); ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Previous</a>
+        <?php if ($currPage > 1): ?>
+            <a href="<?= $baseUrl . ($currPage - 1) ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Previous</a>
         <?php else: ?>
             <span class="px-3 py-1 bg-gray-100 border rounded text-gray-400 text-sm cursor-not-allowed">Previous</span>
         <?php endif; ?>
 
-        <?php for($i = 1; $i <= $filters['total_pages']; $i++): ?>
-            <a href="<?php echo $baseUrl . $i; ?>" class="px-3 py-1 border rounded text-sm <?php echo ($i == $filters['page']) ? 'bg-blue-600 text-white' : 'bg-white hover:bg-gray-50'; ?>">
-                <?php echo $i; ?>
+        <?php for($i = 1; $i <= $maxPage; $i++): ?>
+            <a href="<?= $baseUrl . $i ?>" class="px-3 py-1 border rounded text-sm <?= ($i == $currPage) ? 'bg-blue-600 text-white' : 'bg-white hover:bg-gray-50' ?>">
+                <?= $i ?>
             </a>
         <?php endfor; ?>
 
-        <?php if ($filters['page'] < $filters['total_pages']): ?>
-            <a href="<?php echo $baseUrl . ($filters['page'] + 1); ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Next</a>
+        <?php if ($currPage < $maxPage): ?>
+            <a href="<?= $baseUrl . ($currPage + 1) ?>" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-sm">Next</a>
         <?php else: ?>
             <span class="px-3 py-1 bg-gray-100 border rounded text-gray-400 text-sm cursor-not-allowed">Next</span>
         <?php endif; ?>

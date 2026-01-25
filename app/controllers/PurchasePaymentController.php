@@ -43,7 +43,12 @@ class PurchasePaymentController {
         $stmt->execute($params);
         $payments = $stmt->fetchAll();
 
-        $filters = compact('search', 'fromDate', 'toDate', 'method', 'limit', 'page', 'totalPages', 'totalRecords');
+        // Passed to View
+        $filters = [
+            'search' => $search, 'from' => $fromDate, 'to' => $toDate, 'method' => $method,
+            'limit' => $limit, 'page' => $page, 
+            'total_pages' => $totalPages, 'total_records' => $totalRecords
+        ];
 
         $pageTitle = "Purchase Payments";
         $childView = ROOT_PATH . '/app/views/expenses/payments/index.php';
@@ -78,8 +83,8 @@ class PurchasePaymentController {
                 $totalPaid = floatval($_POST['total_paid']);
                 $accId = $_POST['financial_account_id'];
                 $supplierId = $_POST['supplier_id'];
-                $method = $_POST['payment_method']; // 'check', 'transfer', 'cash'
-                $refNo = $_POST['reference_no']; // Check Number or Ref ID
+                $method = $_POST['payment_method']; // check, transfer, cash
+                $refNo = $_POST['reference_no'];
                 $date = $_POST['date'];
 
                 // 1. Create Payment Header
@@ -88,13 +93,10 @@ class PurchasePaymentController {
                 $stmt->execute([$supplierId, $accId, $method, $refNo, $date, $totalPaid]);
                 $paymentId = $db->lastInsertId();
 
-                // 2. HANDLE FUNDS BASED ON METHOD
+                // 2. HANDLE FUNDS (Logic Update)
                 if ($method === 'check') {
-                    // --- CHECK LOGIC ---
-                    // Do NOT deduct balance yet.
-                    // Create an "Issued" check record.
-                    
-                    // Fetch Supplier Name for Payee
+                    // --- CHECK: DO NOT DEDUCT YET ---
+                    // Create Check Record (Issued)
                     $sup = $db->query("SELECT name FROM suppliers WHERE id = $supplierId")->fetch();
                     $payee = $sup['name'] ?? 'Supplier';
 
@@ -103,30 +105,28 @@ class PurchasePaymentController {
                     $db->prepare($chkSql)->execute([$accId, $refNo, $payee, $date, $totalPaid]);
 
                 } else {
-                    // --- CASH / TRANSFER LOGIC ---
-                    // Deduct immediately
+                    // --- CASH/TRANSFER: DEDUCT IMMEDIATELY ---
                     $db->prepare("UPDATE financial_accounts SET current_balance = current_balance - ? WHERE id = ?")
                        ->execute([$totalPaid, $accId]);
 
-                    // Record Transaction Log (so it appears in the Passbook/Cash Ledger)
-                    $desc = ($method == 'cash' ? "Cash Payment" : "Bank Transfer") . " to Supplier";
+                    // Log Transaction
+                    $desc = ucfirst($method) . " Payment to Supplier";
                     $transSql = "INSERT INTO account_transactions (financial_account_id, date, type, amount, description, reference_no) 
                                  VALUES (?, ?, 'credit', ?, ?, ?)";
                     $db->prepare($transSql)->execute([$accId, $date, $totalPaid, $desc, $refNo]);
                 }
 
-                // 3. Allocate Payment to POs
+                // 3. Allocate to POs
                 $allocations = json_decode($_POST['allocations_json'], true);
                 $allocStmt = $db->prepare("INSERT INTO purchase_payment_allocations (purchase_payment_id, purchase_order_id, amount_applied) VALUES (?, ?, ?)");
                 
-                // Update PO Status logic
+                // Update PO Logic: Pass amount twice (math + comparison)
                 $updatePO = $db->prepare("UPDATE purchase_orders SET amount_paid = amount_paid + ?, status = CASE WHEN (amount_paid + ?) >= total_amount THEN 'paid' ELSE 'partial' END WHERE id = ?");
 
                 foreach ($allocations as $alloc) {
                     $amount = floatval($alloc['amount']);
                     if ($amount > 0) {
                         $allocStmt->execute([$paymentId, $alloc['po_id'], $amount]);
-                        // Pass amount twice: once for addition, once for comparison
                         $updatePO->execute([$amount, $amount, $alloc['po_id']]);
                     }
                 }
