@@ -51,7 +51,7 @@ class RtsController {
         $stmt->execute($params);
         $rts = $stmt->fetchAll();
 
-        // --- UPDATED: Fetch from 'customers' table instead of 'rts_records' ---
+        // Fetch from 'customers' table
         try { 
             $customers = $db->query("SELECT * FROM customers ORDER BY name")->fetchAll(); 
         } catch (Exception $e) { 
@@ -60,13 +60,10 @@ class RtsController {
 
         $filters = compact('search', 'plant', 'fromDate', 'toDate', 'limit', 'page', 'totalPages', 'totalRecords');
         
-        // Pass $customers to the view
         $data = ['rts' => $rts, 'filters' => $filters, 'customers' => $customers];
 
         $pageTitle = "RTS Management";
         $childView = ROOT_PATH . '/app/views/revenue/rts/index.php';
-        
-        // Extract data for view to use directly
         extract($data); 
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
@@ -170,7 +167,7 @@ class RtsController {
         exit();
     }
 
-    // --- IMPORT (With Customer Override) ---
+    // --- IMPORT (Fixed Date Priority) ---
     public function import() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $db = Database::getInstance();
@@ -184,20 +181,31 @@ class RtsController {
             try {
                 while (($row = fgetcsv($file)) !== FALSE) {
                     
-                    // 1. DATE FIX
+                    // --- 1. DATE FIX: PRIORITIZE YYYY-MM-DD ---
                     $rawDate = isset($row[7]) ? trim($row[7]) : '';
                     $finalDate = null;
+
                     if (!empty($rawDate)) {
                         if (is_numeric($rawDate)) {
+                            // Excel Serial Date
                             $unixDate = ($rawDate - 25569) * 86400;
                             $finalDate = gmdate("Y-m-d", $unixDate);
                         } else {
                             $cleanDate = preg_replace('/[^0-9\/\-]/', '', $rawDate);
-                            $d = DateTime::createFromFormat('m/d/Y', $cleanDate);
+                            
+                            // PRIORITY 1: Check Y-m-d (ISO Format: 2025-03-10)
+                            $d = DateTime::createFromFormat('Y-m-d', $cleanDate);
+                            
+                            // PRIORITY 2: Check m/d/Y (US Format: 03/10/2025)
+                            if (!$d) $d = DateTime::createFromFormat('m/d/Y', $cleanDate);
+                            
+                            // PRIORITY 3: Check n/j/Y (US Single Digit: 3/10/2025)
                             if (!$d) $d = DateTime::createFromFormat('n/j/Y', $cleanDate);
-                            if (!$d) $d = DateTime::createFromFormat('Y-m-d', $cleanDate);
-                            if ($d) $finalDate = $d->format('Y-m-d');
-                            else {
+
+                            if ($d) {
+                                $finalDate = $d->format('Y-m-d');
+                            } else {
+                                // Fallback
                                 $ts = strtotime($cleanDate);
                                 if ($ts) $finalDate = date('Y-m-d', $ts);
                             }
@@ -208,8 +216,7 @@ class RtsController {
                     // 2. CHECK HEADER
                     $rts = $db->query("SELECT id FROM rts_records WHERE rd_number = '{$row[6]}'")->fetch();
                     
-                    // --- CUSTOMER NAME LOGIC ---
-                    // If override is selected, use it. Otherwise, use CSV value (Column J / Index 9)
+                    // CUSTOMER LOGIC
                     $plantName = $overrideCustomer ?? ($row[9] ?? 'Unknown');
 
                     if (!$rts) {
@@ -222,7 +229,7 @@ class RtsController {
                             $row[6],        // RD Number
                             $finalDate,     // Date
                             $row[8],        // Plant Code
-                            $plantName,     // Plant Name (Uses Override if available)
+                            $plantName,     // Plant Name (Override or CSV)
                             $row[11],       // PO Number
                             $grNum,         // GR Number
                             $refDoc,        // Ref Doc
@@ -234,7 +241,7 @@ class RtsController {
                         $rtsId = $rts['id'];
                     }
 
-                    // 3. PRICE LOGIC FIX
+                    // 3. PRICE LOGIC
                     $qty = floatval(str_replace(',', '', $row[2] ?? 0));
                     $totalExVat = floatval(str_replace(',', '', $row[5] ?? 0));
 
