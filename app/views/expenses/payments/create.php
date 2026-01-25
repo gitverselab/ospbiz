@@ -33,15 +33,15 @@
             </div>
             <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Payment Method</label>
-                <select name="payment_method" class="w-full border p-2 rounded text-sm bg-white">
+                <select name="payment_method" id="paymentMethod" class="w-full border p-2 rounded text-sm bg-white" onchange="updateRefPlaceholder()">
                     <option value="check">Check</option>
                     <option value="transfer">Bank Transfer</option>
                     <option value="cash">Cash</option>
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Reference No.</label>
-                <input type="text" name="reference_no" class="w-full border p-2 rounded text-sm" placeholder="Check # or Ref #">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1" id="refLabel">Check Number</label>
+                <input type="text" name="reference_no" id="refInput" class="w-full border p-2 rounded text-sm" placeholder="Check Number" required>
             </div>
             <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Payment Date</label>
@@ -108,12 +108,28 @@
 </div>
 
 <script>
-// Toggle input field when checkbox is clicked
+function updateRefPlaceholder() {
+    const method = document.getElementById('paymentMethod').value;
+    const label = document.getElementById('refLabel');
+    const input = document.getElementById('refInput');
+
+    if (method === 'check') {
+        label.innerText = 'Check Number';
+        input.placeholder = 'e.g. 100523';
+    } else {
+        label.innerText = 'Reference No.';
+        input.placeholder = 'Ref / Transaction ID';
+    }
+}
+
+// Initial Call
+updateRefPlaceholder();
+
 function toggleRow(checkbox, maxAmount) {
     const input = checkbox.nextElementSibling;
     if (checkbox.checked) {
         input.disabled = false;
-        input.value = maxAmount.toFixed(2); // Auto-fill with full balance
+        input.value = maxAmount.toFixed(2);
         input.classList.add('bg-yellow-50', 'font-bold');
     } else {
         input.disabled = true;
@@ -123,7 +139,6 @@ function toggleRow(checkbox, maxAmount) {
     calcTotal();
 }
 
-// Sum up all active input fields
 function calcTotal() {
     let total = 0;
     document.querySelectorAll('.pay-input:not([disabled])').forEach(el => {
@@ -133,7 +148,6 @@ function calcTotal() {
     document.getElementById('grandTotalInput').value = total.toFixed(2);
 }
 
-// Package data into JSON before submitting
 function prepareSubmit(e) {
     const allocs = [];
     let total = 0;
@@ -148,7 +162,7 @@ function prepareSubmit(e) {
 
     if (total <= 0) {
         alert("Please select at least one PO to pay.");
-        e.preventDefault(); // Stop form submission
+        e.preventDefault();
         return;
     }
 
