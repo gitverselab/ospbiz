@@ -80,9 +80,6 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
             <a href="/revenue/rts" class="nav-link <?php echo (strpos($uri, '/revenue/rts') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-rotate-left"></i> RTS Management
             </a>
-            <a href="/revenue/imports" class="nav-link <?php echo (strpos($uri, '/revenue/imports') === 0) ? 'active' : ''; ?>">
-                <i class="fa-solid fa-ship"></i> Import Receipts
-            </a>
             <a href="/revenue/sales" class="nav-link <?php echo (strpos($uri, '/revenue/sales') === 0) ? 'active' : ''; ?>">
                 <i class="fa-solid fa-cash-register"></i> Sales Invoices
             </a>
