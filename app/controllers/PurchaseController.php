@@ -124,29 +124,26 @@ class PurchaseController {
         }
     }
 
-    // --- NEW: VIEW PO & HISTORY ---
+    // --- VIEW PO & HISTORY (UPDATED) ---
     public function show() {
         $db = Database::getInstance();
         $id = $_GET['id'] ?? 0;
 
-        // 1. Get PO Header
-        $stmt = $db->prepare("SELECT po.*, s.name as supplier_name, s.address, s.email 
-                              FROM purchase_orders po 
-                              LEFT JOIN suppliers s ON po.supplier_id = s.id 
-                              WHERE po.id = ?");
+        // Header
+        $stmt = $db->prepare("SELECT po.*, s.name as supplier_name, s.address, s.email FROM purchase_orders po LEFT JOIN suppliers s ON po.supplier_id = s.id WHERE po.id = ?");
         $stmt->execute([$id]);
         $po = $stmt->fetch();
-
         if (!$po) { header("Location: /expenses/purchases"); exit; }
 
-        // 2. Get Lines
+        // Items
         $lines = $db->query("SELECT * FROM purchase_order_lines WHERE purchase_order_id = $id")->fetchAll();
 
-        // 3. Get Payment History (Allocations)
-        $paySql = "SELECT pp.reference_no, pp.date, pp.payment_method, ppa.amount_applied 
+        // Payment History (FIX: Fetch Check Status)
+        $paySql = "SELECT pp.reference_no, pp.date, pp.payment_method, ppa.amount_applied, c.status as check_status
                    FROM purchase_payment_allocations ppa
                    JOIN purchase_payments pp ON ppa.purchase_payment_id = pp.id
-                   WHERE ppa.purchase_order_id = ?
+                   LEFT JOIN checks c ON (pp.reference_no = c.check_number AND pp.payment_method = 'check')
+                   WHERE ppa.purchase_order_id = ? 
                    ORDER BY pp.date DESC";
         $stmtPay = $db->prepare($paySql);
         $stmtPay->execute([$id]);

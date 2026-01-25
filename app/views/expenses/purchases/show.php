@@ -103,8 +103,15 @@
                                 <span class="font-bold text-gray-700"><?= $pay['reference_no'] ?></span>
                                 <span class="text-gray-500"><?= $pay['date'] ?></span>
                             </div>
-                            <div class="flex justify-between items-end">
-                                <span class="text-xs text-gray-500 bg-white border px-1 rounded"><?= ucfirst($pay['payment_method']) ?></span>
+                            <div class="flex justify-between items-center">
+                                <div class="flex flex-col">
+                                    <span class="text-xs text-gray-500"><?= ucfirst($pay['payment_method']) ?></span>
+                                    <?php if($pay['payment_method'] === 'check' && !empty($pay['check_status'])): ?>
+                                        <span class="text-[10px] uppercase font-bold <?= $pay['check_status'] === 'cleared' ? 'text-green-600' : 'text-orange-500' ?>">
+                                            (<?= $pay['check_status'] ?>)
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
                                 <span class="font-bold text-green-700 text-sm">₱<?= number_format($pay['amount_applied'], 2) ?></span>
                             </div>
                         </div>
