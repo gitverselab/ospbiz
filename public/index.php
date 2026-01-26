@@ -320,16 +320,16 @@ elseif ($uri === '/settings/receipt/update') {
 }
 // --- SETTINGS: EXPENSE CATEGORIES ---
 elseif ($uri === '/settings/categories') {
-    $c = new ExpenseCategoryController(); $c->index();
+    $c = new CategoryController(); $c->index();
 }
 elseif ($uri === '/settings/categories/store') {
-    $c = new ExpenseCategoryController(); $c->store();
+    $c = new CategoryController(); $c->store();
 }
 elseif ($uri === '/settings/categories/update') {
-    $c = new ExpenseCategoryController(); $c->updateMapping();
+    $c = new CategoryController(); $c->updateMapping();
 }
 elseif ($uri === '/settings/categories/delete') {
-    $c = new ExpenseCategoryController(); $c->delete();
+    $c = new CategoryController(); $c->delete();
 }
 // --- CATCH ALL (Under Construction) ---
 // THIS MUST BE LAST
