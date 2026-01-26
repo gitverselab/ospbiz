@@ -89,7 +89,7 @@ class CheckController {
         }
     }
 
-    // --- UPDATE STATUS (Fixed to Reverse POs) ---
+    // --- UPDATE STATUS (With PO Reversal Logic) ---
     public function status() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
@@ -102,7 +102,7 @@ class CheckController {
             try {
                 $db->beginTransaction();
 
-                // 1. CLEARING (Issued -> Cleared)
+                // 1. CLEARING
                 if ($newStatus === 'cleared' && $check['status'] === 'issued') {
                     $db->prepare("UPDATE checks SET status = 'cleared' WHERE id = ?")->execute([$id]);
                     $db->prepare("UPDATE financial_accounts SET current_balance = current_balance - ? WHERE id = ?")->execute([$check['amount'], $check['financial_account_id']]);
@@ -132,35 +132,9 @@ class CheckController {
                         $db->prepare("INSERT INTO account_transactions (financial_account_id, date, type, amount, description, reference_no) VALUES (?, NOW(), 'debit', ?, ?, ?)")->execute([$check['financial_account_id'], $check['amount'], ucfirst($newStatus)." Check #" . $check['check_number'], strtoupper($newStatus)."-" . $check['check_number']]);
                     }
 
-                    // B. REVERSE PURCHASE ORDERS (Fix for your issue)
+                    // B. REVERSE PURCHASE ORDERS
                     if ($check['source_type'] === 'purchase_payment') {
-                        // 1. Find the Purchase Payment record
-                        $paySql = "SELECT * FROM purchase_payments WHERE reference_no = ? AND payment_method = 'check'";
-                        $stmtPay = $db->prepare($paySql);
-                        $stmtPay->execute([$check['check_number']]);
-                        $payment = $stmtPay->fetch();
-
-                        if ($payment) {
-                            // 2. Find Allocations (Which POs were paid?)
-                            $allocs = $db->query("SELECT * FROM purchase_payment_allocations WHERE purchase_payment_id = {$payment['id']}")->fetchAll();
-
-                            foreach ($allocs as $a) {
-                                // 3. Revert PO Balance and Status
-                                // Logic: amount_paid decreases. If result <= 0, status becomes 'open'. Otherwise 'partial'.
-                                $revSql = "UPDATE purchase_orders 
-                                           SET amount_paid = amount_paid - ?, 
-                                               status = CASE 
-                                                   WHEN (amount_paid - ?) <= 0.01 THEN 'open' 
-                                                   ELSE 'partial' 
-                                               END 
-                                           WHERE id = ?";
-                                $db->prepare($revSql)->execute([$a['amount_applied'], $a['amount_applied'], $a['purchase_order_id']]);
-                            }
-
-                            // 4. Delete the Payment Records (so it vanishes from history)
-                            $db->prepare("DELETE FROM purchase_payment_allocations WHERE purchase_payment_id = ?")->execute([$payment['id']]);
-                            $db->prepare("DELETE FROM purchase_payments WHERE id = ?")->execute([$payment['id']]);
-                        }
+                        $this->reversePurchasePayment($db, $check['check_number']);
                     }
                     
                     // C. Update Check Status
@@ -177,17 +151,69 @@ class CheckController {
         }
     }
 
+    // --- DELETE (UPDATED TO REVERSE PO PAYMENT) ---
     public function delete() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
             $id = $_POST['id'];
             $check = $db->query("SELECT * FROM checks WHERE id=$id")->fetch();
             
-            if ($check['status'] === 'cleared') {
-                $db->prepare("UPDATE financial_accounts SET current_balance = current_balance + ? WHERE id = ?")->execute([$check['amount'], $check['financial_account_id']]);
+            if (!$check) die("Check not found.");
+
+            try {
+                $db->beginTransaction();
+
+                // 1. If Cleared/Manual, Refund the bank
+                if ($check['status'] === 'cleared' || ($check['source_type'] === 'manual' && $check['status'] === 'issued')) {
+                    $db->prepare("UPDATE financial_accounts SET current_balance = current_balance + ? WHERE id = ?")
+                       ->execute([$check['amount'], $check['financial_account_id']]);
+                }
+
+                // 2. IMPORTANT: Remove the Purchase Payment Record
+                if ($check['source_type'] === 'purchase_payment') {
+                    $this->reversePurchasePayment($db, $check['check_number']);
+                }
+
+                // 3. Delete the Check
+                $db->prepare("DELETE FROM checks WHERE id = ?")->execute([$id]);
+                
+                $db->commit();
+                header("Location: /bank/checks");
+
+            } catch (Exception $e) {
+                $db->rollBack();
+                die($e->getMessage());
             }
-            $db->prepare("DELETE FROM checks WHERE id = ?")->execute([$id]);
-            header("Location: /bank/checks");
+        }
+    }
+
+    // Helper to keep code clean
+    private function reversePurchasePayment($db, $checkNumber) {
+        // Find the payment
+        $paySql = "SELECT * FROM purchase_payments WHERE reference_no = ? AND payment_method = 'check'";
+        $stmtPay = $db->prepare($paySql);
+        $stmtPay->execute([$checkNumber]);
+        $payment = $stmtPay->fetch();
+
+        if ($payment) {
+            // Find what POs were paid
+            $allocs = $db->query("SELECT * FROM purchase_payment_allocations WHERE purchase_payment_id = {$payment['id']}")->fetchAll();
+
+            foreach ($allocs as $a) {
+                // Revert Amount and Status
+                $revSql = "UPDATE purchase_orders 
+                           SET amount_paid = amount_paid - ?, 
+                               status = CASE 
+                                   WHEN (amount_paid - ?) <= 0.01 THEN 'open' 
+                                   ELSE 'partial' 
+                               END 
+                           WHERE id = ?";
+                $db->prepare($revSql)->execute([$a['amount_applied'], $a['amount_applied'], $a['purchase_order_id']]);
+            }
+
+            // Delete the Payment History Logs
+            $db->prepare("DELETE FROM purchase_payment_allocations WHERE purchase_payment_id = ?")->execute([$payment['id']]);
+            $db->prepare("DELETE FROM purchase_payments WHERE id = ?")->execute([$payment['id']]);
         }
     }
 }
