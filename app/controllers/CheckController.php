@@ -89,7 +89,6 @@ class CheckController {
         }
     }
 
-    // --- UPDATE STATUS (With PO Reversal Logic) ---
     public function status() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
@@ -107,7 +106,6 @@ class CheckController {
                     $db->prepare("UPDATE checks SET status = 'cleared' WHERE id = ?")->execute([$id]);
                     $db->prepare("UPDATE financial_accounts SET current_balance = current_balance - ? WHERE id = ?")->execute([$check['amount'], $check['financial_account_id']]);
 
-                    // Link Expense
                     $findSql = "SELECT id FROM account_transactions WHERE reference_no = ? AND financial_account_id IS NULL AND amount = ?";
                     $pendingTxn = $db->prepare($findSql);
                     $pendingTxn->execute([$check['check_number'], $check['amount']]);
@@ -121,7 +119,7 @@ class CheckController {
                     }
                 }
 
-                // 2. VOIDING / CANCELLING / BOUNCING
+                // 2. VOIDING / CANCELLING
                 elseif (($newStatus === 'void' || $newStatus === 'cancelled' || $newStatus === 'bounced') && $check['status'] !== 'void') {
                     
                     // A. Refund Bank Balance (Only if cleared or manual)
@@ -132,9 +130,9 @@ class CheckController {
                         $db->prepare("INSERT INTO account_transactions (financial_account_id, date, type, amount, description, reference_no) VALUES (?, NOW(), 'debit', ?, ?, ?)")->execute([$check['financial_account_id'], $check['amount'], ucfirst($newStatus)." Check #" . $check['check_number'], strtoupper($newStatus)."-" . $check['check_number']]);
                     }
 
-                    // B. REVERSE PURCHASE ORDERS
+                    // B. REVERSE PO PAYMENT (The Fix: Insert Negative Record)
                     if ($check['source_type'] === 'purchase_payment') {
-                        $this->reversePurchasePayment($db, $check['check_number']);
+                        $this->reversePurchasePayment($db, $check['check_number'], $newStatus);
                     }
                     
                     // C. Update Check Status
@@ -151,7 +149,6 @@ class CheckController {
         }
     }
 
-    // --- DELETE (UPDATED TO REVERSE PO PAYMENT) ---
     public function delete() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
@@ -163,18 +160,16 @@ class CheckController {
             try {
                 $db->beginTransaction();
 
-                // 1. If Cleared/Manual, Refund the bank
                 if ($check['status'] === 'cleared' || ($check['source_type'] === 'manual' && $check['status'] === 'issued')) {
                     $db->prepare("UPDATE financial_accounts SET current_balance = current_balance + ? WHERE id = ?")
                        ->execute([$check['amount'], $check['financial_account_id']]);
                 }
 
-                // 2. IMPORTANT: Remove the Purchase Payment Record
+                // REVERSE PO PAYMENT (History kept via Reversal)
                 if ($check['source_type'] === 'purchase_payment') {
-                    $this->reversePurchasePayment($db, $check['check_number']);
+                    $this->reversePurchasePayment($db, $check['check_number'], 'Deleted');
                 }
 
-                // 3. Delete the Check
                 $db->prepare("DELETE FROM checks WHERE id = ?")->execute([$id]);
                 
                 $db->commit();
@@ -187,20 +182,38 @@ class CheckController {
         }
     }
 
-    // Helper to keep code clean
-    private function reversePurchasePayment($db, $checkNumber) {
-        // Find the payment
+    // --- REVERSAL HELPER (INSERT NEGATIVE RECORDS) ---
+    private function reversePurchasePayment($db, $checkNumber, $reason) {
+        // 1. Find the original payment
         $paySql = "SELECT * FROM purchase_payments WHERE reference_no = ? AND payment_method = 'check'";
         $stmtPay = $db->prepare($paySql);
         $stmtPay->execute([$checkNumber]);
         $payment = $stmtPay->fetch();
 
         if ($payment) {
-            // Find what POs were paid
+            // 2. Find Allocations (Which POs were paid?)
             $allocs = $db->query("SELECT * FROM purchase_payment_allocations WHERE purchase_payment_id = {$payment['id']}")->fetchAll();
 
+            // 3. Create a Reversal Payment Header (Negative Amount)
+            // We create a new payment record so it shows in history as "VOID-XXXX" with negative value
+            $newRef = "VOID-" . $payment['reference_no'];
+            $negTotal = -1 * abs($payment['total_paid']);
+            
+            $insPay = $db->prepare("INSERT INTO purchase_payments (company_id, supplier_id, financial_account_id, payment_method, reference_no, date, total_paid) VALUES (?, ?, ?, ?, ?, NOW(), ?)");
+            $insPay->execute([
+                $payment['company_id'], 
+                $payment['supplier_id'], 
+                $payment['financial_account_id'], 
+                'check', 
+                $newRef, 
+                $negTotal
+            ]);
+            $newPayId = $db->lastInsertId();
+
             foreach ($allocs as $a) {
-                // Revert Amount and Status
+                $amountReversed = $a['amount_applied']; // Positive value to subtract
+
+                // A. Revert PO Balance and Status (This corrects the PO logic)
                 $revSql = "UPDATE purchase_orders 
                            SET amount_paid = amount_paid - ?, 
                                status = CASE 
@@ -208,12 +221,19 @@ class CheckController {
                                    ELSE 'partial' 
                                END 
                            WHERE id = ?";
-                $db->prepare($revSql)->execute([$a['amount_applied'], $a['amount_applied'], $a['purchase_order_id']]);
-            }
+                $db->prepare($revSql)->execute([$amountReversed, $amountReversed, $a['purchase_order_id']]);
 
-            // Delete the Payment History Logs
-            $db->prepare("DELETE FROM purchase_payment_allocations WHERE purchase_payment_id = ?")->execute([$payment['id']]);
-            $db->prepare("DELETE FROM purchase_payments WHERE id = ?")->execute([$payment['id']]);
+                // B. Insert Negative Allocation (This corrects the History View)
+                $negAlloc = -1 * abs($amountReversed);
+                $db->prepare("INSERT INTO purchase_payment_allocations (purchase_payment_id, purchase_order_id, amount_applied) VALUES (?, ?, ?)")
+                   ->execute([$newPayId, $a['purchase_order_id'], $negAlloc]);
+            }
+            
+            // Note: We do NOT delete the old payment records anymore.
+            // Result: PO History shows: 
+            // 1. Check #1001  +1000.00
+            // 2. VOID-1001    -1000.00
+            // Net Balance on PO: Correct.
         }
     }
 }

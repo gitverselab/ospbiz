@@ -43,7 +43,6 @@ class PurchasePaymentController {
         $stmt->execute($params);
         $payments = $stmt->fetchAll();
 
-        // Passed to View
         $filters = [
             'search' => $search, 'from' => $fromDate, 'to' => $toDate, 'method' => $method,
             'limit' => $limit, 'page' => $page, 
@@ -83,9 +82,25 @@ class PurchasePaymentController {
                 $totalPaid = floatval($_POST['total_paid']);
                 $accId = $_POST['financial_account_id'];
                 $supplierId = $_POST['supplier_id'];
-                $method = $_POST['payment_method']; // check, transfer, cash
+                $method = $_POST['payment_method']; 
                 $refNo = $_POST['reference_no'];
                 $date = $_POST['date'];
+                
+                // Get Allocations to build Memo
+                $allocations = json_decode($_POST['allocations_json'], true);
+                $poIds = array_column($allocations, 'po_id');
+                
+                // Build Dynamic Memo (e.g., "Payment for PO-101, PO-102")
+                $memo = "Payment for POs";
+                if (!empty($poIds)) {
+                    $placeholders = str_repeat('?,', count($poIds) - 1) . '?';
+                    $stmtPo = $db->prepare("SELECT po_number FROM purchase_orders WHERE id IN ($placeholders)");
+                    $stmtPo->execute($poIds);
+                    $poNumbers = $stmtPo->fetchAll(PDO::FETCH_COLUMN);
+                    if ($poNumbers) {
+                        $memo = "Payment for " . implode(', ', $poNumbers);
+                    }
+                }
 
                 // 1. Create Payment Header
                 $sql = "INSERT INTO purchase_payments (company_id, supplier_id, financial_account_id, payment_method, reference_no, date, total_paid) VALUES (1, ?, ?, ?, ?, ?, ?)";
@@ -93,34 +108,30 @@ class PurchasePaymentController {
                 $stmt->execute([$supplierId, $accId, $method, $refNo, $date, $totalPaid]);
                 $paymentId = $db->lastInsertId();
 
-                // 2. HANDLE FUNDS (Logic Update)
+                // 2. HANDLE FUNDS
                 if ($method === 'check') {
-                    // --- CHECK: DO NOT DEDUCT YET ---
-                    // Create Check Record (Issued)
+                    // Check Logic: Issued status, no deduction yet
                     $sup = $db->query("SELECT name FROM suppliers WHERE id = $supplierId")->fetch();
                     $payee = $sup['name'] ?? 'Supplier';
 
+                    // Use the dynamic $memo here
                     $chkSql = "INSERT INTO checks (company_id, financial_account_id, check_number, payee_name, date, amount, memo, status, source_type) 
-                               VALUES (1, ?, ?, ?, ?, ?, 'Payment for POs', 'issued', 'purchase_payment')";
-                    $db->prepare($chkSql)->execute([$accId, $refNo, $payee, $date, $totalPaid]);
+                               VALUES (1, ?, ?, ?, ?, ?, ?, 'issued', 'purchase_payment')";
+                    $db->prepare($chkSql)->execute([$accId, $refNo, $payee, $date, $totalPaid, $memo]);
 
                 } else {
-                    // --- CASH/TRANSFER: DEDUCT IMMEDIATELY ---
+                    // Cash/Transfer Logic: Immediate deduction
                     $db->prepare("UPDATE financial_accounts SET current_balance = current_balance - ? WHERE id = ?")
                        ->execute([$totalPaid, $accId]);
 
-                    // Log Transaction
-                    $desc = ucfirst($method) . " Payment to Supplier";
+                    $desc = ucfirst($method) . " Payment to Supplier (" . implode(', ', $poNumbers ?? []) . ")";
                     $transSql = "INSERT INTO account_transactions (financial_account_id, date, type, amount, description, reference_no) 
                                  VALUES (?, ?, 'credit', ?, ?, ?)";
                     $db->prepare($transSql)->execute([$accId, $date, $totalPaid, $desc, $refNo]);
                 }
 
-                // 3. Allocate to POs
-                $allocations = json_decode($_POST['allocations_json'], true);
+                // 3. Allocate
                 $allocStmt = $db->prepare("INSERT INTO purchase_payment_allocations (purchase_payment_id, purchase_order_id, amount_applied) VALUES (?, ?, ?)");
-                
-                // Update PO Logic: Pass amount twice (math + comparison)
                 $updatePO = $db->prepare("UPDATE purchase_orders SET amount_paid = amount_paid + ?, status = CASE WHEN (amount_paid + ?) >= total_amount THEN 'paid' ELSE 'partial' END WHERE id = ?");
 
                 foreach ($allocations as $alloc) {
