@@ -1,21 +1,22 @@
 <?php
-class ExpenseCategoryController {
+class CategoryController {
 
     // --- LIST & MAP CATEGORIES ---
     public function index() {
         $db = Database::getInstance();
 
-        // Fetch all categories with their linked account info
-        $sql = "SELECT ec.*, a.code as account_code, a.name as account_name 
-                FROM expense_categories ec 
-                LEFT JOIN accounts a ON ec.account_id = a.id 
-                ORDER BY ec.name ASC";
+        // Updated SQL to use 'categories' table
+        $sql = "SELECT c.*, a.code as account_code, a.name as account_name 
+                FROM categories c 
+                LEFT JOIN accounts a ON c.account_id = a.id 
+                ORDER BY c.name ASC";
         $categories = $db->query($sql)->fetchAll();
 
-        // Fetch Expense Accounts for the dropdown (Type: Expense or Cost of Goods Sold)
-        $accounts = $db->query("SELECT * FROM accounts WHERE type IN ('Expense', 'Cost of Goods Sold') ORDER BY code ASC")->fetchAll();
+        // Fetch Accounts for the dropdown (Expense, COGS, Asset)
+        $accounts = $db->query("SELECT * FROM accounts WHERE type IN ('expense', 'asset', 'liability', 'equity') ORDER BY code ASC")->fetchAll();
 
-        $pageTitle = "Expense Categories";
+        $pageTitle = "Transaction Categories";
+        // Make sure to rename your view folder from 'expense_categories' to 'categories' or update path below
         $childView = ROOT_PATH . '/app/views/settings/categories/index.php';
         require_once ROOT_PATH . '/app/views/layouts/main.php';
     }
@@ -27,7 +28,8 @@ class ExpenseCategoryController {
             $name = $_POST['name'];
             $desc = $_POST['description'];
             
-            $stmt = $db->prepare("INSERT INTO expense_categories (name, description) VALUES (?, ?)");
+            // Updated table name
+            $stmt = $db->prepare("INSERT INTO categories (name, description) VALUES (?, ?)");
             $stmt->execute([$name, $desc]);
             
             header("Location: /settings/categories");
@@ -41,10 +43,10 @@ class ExpenseCategoryController {
             $catId = $_POST['category_id'];
             $accId = $_POST['account_id'];
             
-            // If user selected "Select Account", set to NULL
             $accId = ($accId == "") ? NULL : $accId;
 
-            $stmt = $db->prepare("UPDATE expense_categories SET account_id = ? WHERE id = ?");
+            // Updated table name
+            $stmt = $db->prepare("UPDATE categories SET account_id = ? WHERE id = ?");
             $stmt->execute([$accId, $catId]);
             
             header("Location: /settings/categories");
@@ -56,7 +58,8 @@ class ExpenseCategoryController {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getInstance();
             $id = $_POST['id'];
-            $db->prepare("DELETE FROM expense_categories WHERE id = ?")->execute([$id]);
+            // Updated table name
+            $db->prepare("DELETE FROM categories WHERE id = ?")->execute([$id]);
             header("Location: /settings/categories");
         }
     }

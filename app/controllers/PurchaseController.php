@@ -81,7 +81,9 @@ class PurchaseController {
     public function create() {
         $db = Database::getInstance();
         $suppliers = $db->query("SELECT * FROM suppliers WHERE is_active=1 ORDER BY name ASC")->fetchAll();
-        $items = $db->query("SELECT * FROM items")->fetchAll(); 
+        
+        // --- UPDATED: Fetch CATEGORIES instead of Accounts ---
+        $categories = $db->query("SELECT * FROM categories ORDER BY name ASC")->fetchAll();
 
         $pageTitle = "Create Purchase Order";
         $childView = ROOT_PATH . '/app/views/expenses/purchases/create.php';
@@ -189,41 +191,53 @@ class PurchaseController {
             $db = Database::getInstance();
             try {
                 $db->beginTransaction();
-
                 $lines = json_decode($_POST['lines_json'], true);
                 $total = array_sum(array_column($lines, 'amount'));
                 $deliveryDate = !empty($_POST['expected_delivery_date']) ? $_POST['expected_delivery_date'] : null;
 
+                // [Keep PO Header Logic (Insert/Update purchase_orders table) SAME AS BEFORE]
                 if ($isUpdate) {
                     $id = $_POST['id'];
                     $sql = "UPDATE purchase_orders SET supplier_id=?, po_number=?, date=?, expected_delivery_date=?, total_amount=? WHERE id=?";
-                    $stmt = $db->prepare($sql);
-                    $stmt->execute([$_POST['supplier_id'], $_POST['po_number'], $_POST['date'], $deliveryDate, $total, $id]);
-                    
-                    // Clear old lines
+                    $db->prepare($sql)->execute([$_POST['supplier_id'], $_POST['po_number'], $_POST['date'], $deliveryDate, $total, $id]);
                     $db->prepare("DELETE FROM purchase_order_lines WHERE purchase_order_id = ?")->execute([$id]);
                     $poId = $id;
                 } else {
-                    $sql = "INSERT INTO purchase_orders (company_id, supplier_id, po_number, date, expected_delivery_date, status, total_amount) VALUES (?, ?, ?, ?, ?, 'open', ?)";
-                    $stmt = $db->prepare($sql);
-                    $stmt->execute([1, $_POST['supplier_id'], $_POST['po_number'], $_POST['date'], $deliveryDate, $total]);
+                    $sql = "INSERT INTO purchase_orders (company_id, supplier_id, po_number, date, expected_delivery_date, status, total_amount) VALUES (1, ?, ?, ?, ?, 'open', ?)";
+                    $db->prepare($sql)->execute([$_POST['supplier_id'], $_POST['po_number'], $_POST['date'], $deliveryDate, $total]);
                     $poId = $db->lastInsertId();
                 }
 
-                // Insert Lines
-                $lineSql = "INSERT INTO purchase_order_lines (purchase_order_id, description, quantity, unit_price, amount) VALUES (?, ?, ?, ?, ?)";
+                // --- UPDATED: Handle Category Mapping ---
+                $lineSql = "INSERT INTO purchase_order_lines (purchase_order_id, category_id, account_id, description, quantity, unit_price, amount) VALUES (?, ?, ?, ?, ?, ?, ?)";
                 $lineStmt = $db->prepare($lineSql);
                 
                 foreach ($lines as $line) {
-                    $lineStmt->execute([$poId, $line['description'], $line['quantity'], $line['unit_price'], $line['amount']]);
+                    $catId = !empty($line['category_id']) ? $line['category_id'] : null;
+                    $accId = null;
+
+                    // AUTO-DETECT ACCOUNT based on Category
+                    if ($catId) {
+                        $mapping = $db->query("SELECT account_id FROM categories WHERE id = $catId")->fetch();
+                        if ($mapping) {
+                            $accId = $mapping['account_id'];
+                        }
+                    }
+
+                    $lineStmt->execute([
+                        $poId, 
+                        $catId, 
+                        $accId, // Automatically filled from DB
+                        $line['description'], 
+                        $line['quantity'], 
+                        $line['unit_price'], 
+                        $line['amount']
+                    ]);
                 }
 
                 $db->commit();
                 header("Location: /expenses/purchases");
-            } catch (Exception $e) {
-                $db->rollBack();
-                die($e->getMessage());
-            }
+            } catch (Exception $e) { $db->rollBack(); die($e->getMessage()); }
         }
     }
 }
