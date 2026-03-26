@@ -1,3 +1,0 @@
-"Item Code",Description,Qty,UOM,Currency,Price,"Reference Doc","GR Date","Plant Code","Plant Name","Vat Inc.","PO Number","GR Number","Reason for Failure"
-4000000066,"Fruit,mongo,red,sweetened,500gm/pk",1000,PAC,PHP,42000,4647,13/08/2025,ZL03,"ZF Logistics Calamba",47040,3083635776,5016030527,"Invalid Date Format: 13/08/2025"
-4000000056,"Fruit,banana,sweetened,500gmkg/pk",2500,PAC,PHP,101250,4647,13/08/2025,ZL03,"ZF Logistics Calamba",113400,3083635776,5016030527,"Invalid Date Format: 13/08/2025"
