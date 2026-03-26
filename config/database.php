@@ -3,9 +3,9 @@
 
 // Database credentials
 define('DB_SERVER', 'localhost');
-define('DB_USERNAME', 'u539825091_ospact');
-define('DB_PASSWORD', 'B@dw0lfz');
-define('DB_NAME', 'u539825091_ospact');
+define('DB_USERNAME', 'u539825091_ospbizbeta');
+define('DB_PASSWORD', 'Ospbizbeta1');
+define('DB_NAME', 'u539825091_ospbizbeta');
 
 /* Attempt to connect to MySQL database */
 $conn = new mysqli(DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_NAME);

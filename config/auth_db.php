@@ -3,9 +3,9 @@
 // Dedicated connection for AUTH database (users table lives here)
 
 define('AUTH_DB_SERVER',   'localhost');
-define('AUTH_DB_USERNAME', 'u539825091_ospta_t');
-define('AUTH_DB_PASSWORD', 'B@dw0lfz');
-define('AUTH_DB_NAME',     'u539825091_ospta_t');
+define('AUTH_DB_USERNAME', 'u539825091_ostimebeta');
+define('AUTH_DB_PASSWORD', 'Ostimebeta1');
+define('AUTH_DB_NAME',     'u539825091_ostimebeta');
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
