@@ -1,0 +1,24 @@
+/* public/css/print.css */
+
+/* This is the main rule that hides everything by default when printing */
+body * {
+    visibility: hidden;
+}
+
+/* This rule says "make the report area and everything inside it visible again" */
+#printable-area, #printable-area * {
+    visibility: visible;
+}
+
+/* This positions the report at the top of the print page */
+#printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+}
+
+/* A helper class to explicitly hide things like buttons and forms */
+.no-print {
+    display: none !important;
+}
